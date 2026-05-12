@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -16,10 +15,11 @@ import {
 
 interface SidebarProps {
   institutionName: string;
+  isCollapsed: boolean;
+  onCollapseChange: (collapsed: boolean) => void;
 }
 
-export default function Sidebar({ institutionName }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export default function Sidebar({ institutionName, isCollapsed, onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
 
   const menuItems = [
@@ -53,7 +53,7 @@ export default function Sidebar({ institutionName }: SidebarProps) {
           </div>
         )}
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => onCollapseChange(!isCollapsed)}
           className="p-1.5 hover:bg-slate-700 rounded transition"
           title={isCollapsed ? 'Expandir' : 'Colapsar'}
         >

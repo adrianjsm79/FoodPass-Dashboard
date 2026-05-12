@@ -11,8 +11,8 @@ import { toast } from 'sonner';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { auth, isLoading } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -49,13 +49,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const institutionName = auth.instituciones?.[0]?.nombre || 'Institución';
-  const sidebarWidth = isCollapsed ? 'w-20' : 'w-64';
 
   return (
     <div className="flex h-screen">
-      <Sidebar institutionName={institutionName} />
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarWidth}`}>
-        <Header sidebarWidth={sidebarWidth} />
+      <Sidebar institutionName={institutionName} isCollapsed={isCollapsed} onCollapseChange={setIsCollapsed} />
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <Header />
         <main className="flex-1 overflow-auto bg-slate-50 mt-20 p-6">{children}</main>
       </div>
     </div>

@@ -5,30 +5,68 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import styles from "./login.module.css";
 import { Eye, EyeOff } from "lucide-react";
+import { api } from "@/config/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { isUserAuthorized } from "@/lib/auth";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [contrasena, setContrasena] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { setAuth } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim() !== "") {
-      localStorage.setItem("foodpass_user", username);
+    
+    if (!correo.trim() || !contrasena.trim()) {
+      toast.error("Por favor completa todos los campos");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await api.login(correo, contrasena);
+      
+      // Verificar si el usuario tiene instituciones y al menos una con rol autorizado
+      if (
+        !response.instituciones ||
+        response.instituciones.length === 0 ||
+        !response.instituciones.some((inst: any) => isUserAuthorized(inst.rol))
+      ) {
+        toast.error("No estás autorizado para acceder al panel");
+        setIsLoading(false);
+        return;
+      }
+
+      // Guardar en contexto de autenticación
+      setAuth({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        user: response.user,
+        instituciones: response.instituciones,
+      });
+
+      toast.success("Sesión iniciada correctamente");
       router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Error de login:", error);
+      const errorMessage = error.message || "Error al iniciar sesión";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    // 2. Aplicar las clases usando el objeto 'styles'
     <div className={styles.pageContainer}>
-      {/* Contenedor Principal */}
       <div className={styles.card}>
         
         {/* LADO IZQUIERDO: Imagen con Veladura de Gradiente */}
         <div className={styles.imageSection}>
-          {/* Imagen de fondo */}
           <Image 
             src="/assets/fondo-comedor.png" 
             alt="Comedor Estudiantil"
@@ -37,10 +75,8 @@ export default function LoginPage() {
             priority
           />
           
-          {/* Veladura: Gradiente vertical definido en CSS */}
           <div className={styles.overlay}></div>
           
-          {/* Logo de marca (Imagen sobre el fondo) */}
           <div className={styles.logoContainer}>
             <div className={styles.logoWrapper}>
               <Image 
@@ -60,16 +96,17 @@ export default function LoginPage() {
           <p className={styles.subtitle}>Ingresa tus credenciales para acceder al panel</p>
 
           <form onSubmit={handleLogin}>
-            {/* Campo Usuario */}
+            {/* Campo Usuario/Correo */}
             <div className={styles.formGroup}>
               <label className={styles.label}>
-                Usuario <span className={styles.requiredStar}>*</span>
+                Correo <span className={styles.requiredStar}>*</span>
               </label>
               <input
-                type="text"
-                placeholder="nombre o correo"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                placeholder="tu@correo.com"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                disabled={isLoading}
                 required
                 className={styles.input}
               />
@@ -84,14 +121,16 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={contrasena}
+                  onChange={(e) => setContrasena(e.target.value)}
+                  disabled={isLoading}
                   required
                   className={styles.input}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
                   className={styles.togglePasswordBtn}
                 >
                   {showPassword ? (
@@ -106,9 +145,10 @@ export default function LoginPage() {
             {/* Botón Ingresar */}
             <button
               type="submit"
+              disabled={isLoading}
               className={styles.submitBtn}
             >
-              ingresar
+              {isLoading ? "Cargando..." : "ingresar"}
             </button>
           </form>
 

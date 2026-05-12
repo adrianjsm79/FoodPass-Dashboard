@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.API_BASE_URL || 'https://foodpass-backend.onrender.com/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://foodpass-backend.onrender.com/api';
 
 export const api = {
   login: async (correo: string, contrasena: string) => {
