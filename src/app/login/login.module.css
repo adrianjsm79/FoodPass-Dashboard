@@ -1,0 +1,234 @@
+
+/* Animación de entrada */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Contenedores principales */
+.pageContainer {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #262c3a;
+  padding: 1rem;
+  font-family: sans-serif;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 900px;
+  background-color: white;
+  border-radius: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  min-height: 550px;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+@media (min-width: 768px) {
+  .card {
+    flex-direction: row;
+  }
+}
+
+/* Sección Izquierda (Imagen y Veladura) */
+.imageSection {
+  position: relative;
+  width: 100%;
+  min-height: 300px;
+}
+
+@media (min-width: 768px) {
+  .imageSection {
+    width: 50%;
+    min-height: 100%;
+  }
+}
+
+.backgroundImage {
+  object-fit: cover;
+  filter: brightness(0.85);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  /* Top: #0D8945 al 80% | Bottom: #74D63B al 80% */
+  background: linear-gradient(to bottom, rgba(13, 137, 69, 0.80), rgba(116, 214, 59, 0.80));
+}
+
+.logoContainer {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.logoWrapper {
+  width: 100%;
+  max-width: 220px;
+}
+
+.logoImage {
+  filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1));
+}
+
+/* Sección Derecha (Formulario) */
+.formSection {
+  width: 100%;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-color: white;
+}
+
+@media (min-width: 768px) {
+  .formSection {
+    width: 50%;
+    padding: 4rem;
+  }
+}
+
+.title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #111827; /* gray-900 */
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #6B7280; /* gray-500 */
+  font-size: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #374151; /* gray-700 */
+  margin-bottom: 0.5rem;
+}
+
+.requiredStar {
+  color: #EF4444; /* red-500 */
+}
+
+.inputWrapper {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border: 1px solid #E5E7EB; /* gray-200 */
+  border-radius: 0.75rem;
+  color: #1F2937; /* gray-800 */
+  transition: all 0.2s;
+}
+
+.input::placeholder {
+  color: #D1D5DB; /* gray-300 */
+}
+
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #0D8945;
+  border-color: transparent;
+}
+
+.togglePasswordBtn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9CA3AF; /* gray-400 */
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.togglePasswordBtn:hover {
+  color: #0D8945;
+}
+
+.icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.submitBtn {
+  width: 100%;
+  background-color: #0D8945;
+  color: white;
+  font-weight: 700;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  margin-top: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 10px 15px -3px rgba(13, 137, 69, 0.2);
+}
+
+.submitBtn:hover {
+  background-color: #74D63B;
+}
+
+.submitBtn:active {
+  transform: scale(0.98);
+}
+
+.supportText {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #6B7280; /* gray-500 */
+}
+
+.supportLink {
+  color: #0D8945;
+  font-weight: 700;
+  text-decoration: none;
+  margin-left: 0.25rem;
+  transition: all 0.2s;
+}
+
+.supportLink:hover {
+  text-decoration: underline;
+}
+
+/* Ocultar el icono de "ojo" nativo de Edge y otros navegadores */
+.input::-ms-reveal,
+.input::-ms-clear {
+  display: none;
+}
+
+/* Opcional: Ocultar el icono de autocompletado en navegadores basados en WebKit (Chrome/Edge) */
+.input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
