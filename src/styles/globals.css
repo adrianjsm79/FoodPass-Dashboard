@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-white font-sans;
+  }
+
+  h1{
+    @apply text-gray-900 dark:text-white;
+  }
+}
+
+@layer components {
+  
+}
