@@ -6,7 +6,11 @@ import { LogOut } from 'lucide-react';
 import { api } from '@/config/api';
 import { toast } from 'sonner';
 
-export default function Header() {
+interface HeaderProps {
+  isCollapsed: boolean;
+}
+
+export default function Header({ isCollapsed = false }: HeaderProps) {
   const { auth, logout } = useAuth();
   const router = useRouter();
 
@@ -26,7 +30,7 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-64 right-0 bg-white border-b border-slate-200 shadow-sm z-40 transition-all duration-300">
+    <header className={`fixed top-0 ${isCollapsed ? 'left-20' : 'left-64'} right-0 bg-white border-b border-slate-200 shadow-sm z-40 transition-all duration-300`}>
       <div className="h-20 px-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">

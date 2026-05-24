@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen">
       <Sidebar institutionName={institutionName} isCollapsed={isCollapsed} onCollapseChange={setIsCollapsed} />
       <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'}`}>
-        <Header />
+        <Header isCollapsed={isCollapsed} />
         <main className="flex-1 overflow-auto bg-slate-50 mt-20 p-6">{children}</main>
       </div>
     </div>
