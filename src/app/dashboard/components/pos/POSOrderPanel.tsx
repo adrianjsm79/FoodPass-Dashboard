@@ -1,8 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { ShoppingCart, Trash2, Minus, Plus, CreditCard, Wallet, Clock, ImagePlus } from 'lucide-react';
-import { EfectivoModal, YapeModal, PostPagoModal, PostPagoAccount } from './PaymentModals';
+
+import {
+  ShoppingCart,
+  Trash2,
+  Minus,
+  Plus,
+  CreditCard,
+  Wallet,
+  Clock,
+  ImagePlus,
+} from 'lucide-react';
+
+import {
+  EfectivoModal,
+  YapeModal,
+  PostPagoModal,
+  PostPagoAccount,
+} from './PaymentModals';
 
 export interface CartItem {
   productId: string;
@@ -12,18 +28,34 @@ export interface CartItem {
   imagen?: string;
 }
 
-type PaymentMethod = 'efectivo' | 'yape' | 'postpago';
+type PaymentMethod =
+  | 'efectivo'
+  | 'yape'
+  | 'postpago';
 
 interface POSOrderPanelProps {
   items: CartItem[];
+
   postPagoAccount?: PostPagoAccount | null;
-  onQuantityChange: (productId: string, quantity: number) => void;
-  onRemoveItem: (productId: string) => void;
+
+  onQuantityChange: (
+    productId: string,
+    quantity: number
+  ) => void;
+
+  onRemoveItem: (
+    productId: string
+  ) => void;
+
   onVaciar: () => void;
-  onPayment: (method: PaymentMethod) => void;
+
+  onPayment: (
+    method: PaymentMethod
+  ) => void;
 }
 
-const DEMO_POSTPAGO_ACCOUNT: PostPagoAccount = {
+const DEMO_POSTPAGO_ACCOUNT: PostPagoAccount =
+{
   id: 'cp1',
   name: 'Carlos Ríos',
   accountCode: 'cp1',
@@ -33,196 +65,603 @@ const DEMO_POSTPAGO_ACCOUNT: PostPagoAccount = {
 
 export default function POSOrderPanel({
   items,
-  postPagoAccount = DEMO_POSTPAGO_ACCOUNT,
+  postPagoAccount =
+  DEMO_POSTPAGO_ACCOUNT,
   onQuantityChange,
   onRemoveItem,
   onVaciar,
   onPayment,
 }: POSOrderPanelProps) {
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('efectivo');
-  const [activeModal, setActiveModal] = useState<PaymentMethod | null>(null);
+  const [selectedMethod, setSelectedMethod] =
+    useState<PaymentMethod>('efectivo');
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const [activeModal, setActiveModal] =
+    useState<PaymentMethod | null>(
+      null
+    );
+
+  const total = items.reduce(
+    (sum, item) =>
+      sum + item.price * item.quantity,
+    0
+  );
+
   const hasItems = items.length > 0;
 
   const handleCobrar = () => {
     if (!hasItems) return;
+
     setActiveModal(selectedMethod);
   };
 
   const handleConfirm = () => {
     onPayment(selectedMethod);
+
     setActiveModal(null);
   };
 
-  const paymentMethods: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
-    { id: 'efectivo', label: 'Efectivo', icon: <Wallet size={15} /> },
-    { id: 'yape',     label: 'Yape',     icon: <CreditCard size={15} /> },
-    { id: 'postpago', label: 'PostPago', icon: <Clock size={15} /> },
-  ];
+  const paymentMethods: {
+    id: PaymentMethod;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+      {
+        id: 'efectivo',
+        label: 'Efectivo',
+        icon: <Wallet size={18} />,
+      },
+      {
+        id: 'yape',
+        label: 'Yape',
+        icon: <CreditCard size={18} />,
+      },
+      {
+        id: 'postpago',
+        label: 'PostPago',
+        icon: <Clock size={18} />,
+      },
+    ];
 
   return (
     <>
-      {/* ← sticky top-0 + h-screen hace que el panel siempre ocupe la pantalla completa */}
-      <div className="w-[300px] flex-shrink-0 bg-white border-l border-slate-200 flex flex-col sticky top-0 h-screen">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
-          <div className="flex items-center gap-2 text-slate-700 font-medium text-sm">
-            <ShoppingCart size={15} />
-            Orden POS
+      <div
+        className="
+    w-full
+    xl:w-[380px]
+    bg-white
+    rounded-2xl
+    shadow-lg
+    border border-slate-200
+    overflow-hidden
+    flex flex-col
+    h-fit
+    xl:sticky
+    xl:top-6
+  "
+      >
+        {/* ========================= */}
+        {/* HEADER */}
+        {/* ========================= */}
+
+        <div
+          className="
+            bg-gradient-to-r
+            from-green-600
+            to-green-700
+            text-white
+            p-4
+            flex items-center justify-between
+            flex-shrink-0
+          "
+        >
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={22} />
+
+            <h2 className="text-lg font-bold">
+              Carrito
+            </h2>
           </div>
-          <button
-            onClick={onVaciar}
-            className="text-xs text-red-500 hover:text-red-600 flex items-center gap-1 transition-colors"
+
+          <span
+            className="
+              bg-white/20
+              px-3 py-1
+              rounded-full
+              text-sm font-semibold
+            "
           >
-            <Trash2 size={12} />
-            Vaciar
-          </button>
+            {items.length} item
+            {items.length !== 1
+              ? 's'
+              : ''}
+          </span>
         </div>
 
-        {/* Items list — ocupa el espacio disponible y hace scroll */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {items.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center mt-10">Sin productos</p>
+        {/* ========================= */}
+        {/* LISTA */}
+        {/* ========================= */}
+
+        <div
+          className="
+            max-h-[420px]
+            overflow-y-auto
+            p-4
+            space-y-3
+          "
+        >
+          {!hasItems ? (
+            <div className="py-14 text-center">
+              <ShoppingCart
+                size={54}
+                className="mx-auto mb-3 text-slate-300"
+              />
+
+              <p className="text-slate-500">
+                Carrito vacío
+              </p>
+            </div>
           ) : (
             items.map((item) => (
-              <div key={item.productId} className="flex items-center gap-2">
-                {item.imagen ? (
-                  <img
-                    src={item.imagen}
-                    alt={item.name}
-                    className="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-slate-100"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-slate-100 rounded-md flex-shrink-0 flex items-center justify-center">
-                    <ImagePlus size={12} className="text-slate-300" />
+              <div
+                key={item.productId}
+                className="
+                  bg-slate-50
+                  border border-slate-200
+                  rounded-2xl
+                  p-4
+                "
+              >
+                {/* Top */}
+                <div className="flex gap-3">
+                  {/* Imagen */}
+                  {item.imagen ? (
+                    <img
+                      src={item.imagen}
+                      alt={item.name}
+                      className="
+                        w-14 h-14
+                        rounded-xl
+                        object-cover
+                        border border-slate-200
+                        flex-shrink-0
+                      "
+                    />
+                  ) : (
+                    <div
+                      className="
+                        w-14 h-14
+                        rounded-xl
+                        bg-slate-100
+                        flex items-center justify-center
+                        border border-slate-200
+                        flex-shrink-0
+                      "
+                    >
+                      <ImagePlus
+                        size={20}
+                        className="text-slate-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="
+                        font-semibold
+                        text-slate-900
+                        break-words
+                        text-sm sm:text-base
+                      "
+                    >
+                      {item.name}
+                    </p>
+
+                    <p
+                      className="
+                        text-green-600
+                        font-bold
+                        mt-1
+                        text-sm
+                      "
+                    >
+                      S/.{' '}
+                      {(
+                        item.price *
+                        item.quantity
+                      ).toFixed(2)}
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-800 truncate">{item.name}</p>
-                  <p className="text-xs text-slate-400">S/. {Number(item.price).toFixed(2)}</p>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+
+                  {/* Delete */}
                   <button
-                    onClick={() => onQuantityChange(item.productId, item.quantity - 1)}
-                    className="w-5 h-5 rounded border border-slate-200 flex items-center justify-center text-slate-500 hover:border-red-300 hover:text-red-500 text-xs"
+                    onClick={() =>
+                      onRemoveItem(
+                        item.productId
+                      )
+                    }
+                    className="
+                      text-red-500
+                      hover:text-red-700
+                      transition
+                      flex-shrink-0
+                    "
                   >
-                    <Minus size={10} />
+                    <Trash2 size={18} />
                   </button>
-                  <span className="w-5 text-center text-xs font-semibold text-slate-700">
+                </div>
+
+                {/* Quantity */}
+                <div
+                  className="
+                    flex items-center
+                    gap-3
+                    mt-4
+                  "
+                >
+                  <button
+                    onClick={() =>
+                      onQuantityChange(
+                        item.productId,
+                        item.quantity - 1
+                      )
+                    }
+                    className="
+                      w-9 h-9
+                      rounded-lg
+                      border border-slate-300
+                      bg-white
+                      flex items-center justify-center
+                      text-slate-700
+                      hover:bg-slate-100
+                      transition
+                    "
+                  >
+                    <Minus
+                      size={16}
+                      className="text-slate-700"
+                    />
+                  </button>
+
+                  <span
+                    className="
+                      font-bold
+                      text-slate-900
+                      text-base
+                    "
+                  >
                     {item.quantity}
                   </span>
+
                   <button
-                    onClick={() => onQuantityChange(item.productId, item.quantity + 1)}
-                    className="w-5 h-5 rounded border border-slate-200 flex items-center justify-center text-slate-500 hover:border-green-400 hover:text-green-600 text-xs"
+                    onClick={() =>
+                      onQuantityChange(
+                        item.productId,
+                        item.quantity + 1
+                      )
+                    }
+                    className="
+                      w-9 h-9
+                      rounded-lg
+                      border border-slate-300
+                      bg-white
+                      flex items-center justify-center
+                      text-slate-700
+                      hover:bg-slate-100
+                      transition
+                    "
                   >
-                    <Plus size={10} />
+                    <Plus
+                      size={16}
+                      className="text-slate-700"
+                    />
                   </button>
                 </div>
-                <span className="text-xs font-semibold text-slate-700 w-12 text-right flex-shrink-0">
-                  S/. {(Number(item.price) * item.quantity).toFixed(2)}
-                </span>
               </div>
             ))
           )}
         </div>
 
-        {/* Footer — siempre pegado al fondo */}
-        <div className="px-4 py-4 border-t border-slate-100 space-y-3 flex-shrink-0">
-          <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2 text-xs text-purple-600">
-            Se generarán tickets digitales (productos.genera_ticket)
+        {/* ========================= */}
+        {/* FOOTER */}
+        {/* ========================= */}
+
+        <div
+          className="
+            border-t border-slate-200
+            p-4
+            space-y-5
+            flex-shrink-0
+          "
+        >
+          {/* Vaciar */}
+          <button
+            onClick={onVaciar}
+            className="
+              w-full
+              text-red-500
+              hover:text-red-700
+              font-semibold
+              py-2
+              transition
+              flex items-center justify-center gap-2
+            "
+          >
+            <Trash2 size={16} />
+            Limpiar Carrito
+          </button>
+
+          {/* Info */}
+          <div
+            className="
+              bg-purple-50
+              border border-purple-100
+              rounded-xl
+              px-4 py-3
+              text-sm
+              text-purple-700
+            "
+          >
+            Se generarán tickets
+            digitales automáticamente
           </div>
 
-          <div>
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
+          {/* Totales */}
+          <div className="space-y-2">
+            <div
+              className="
+                flex justify-between
+                text-slate-700
+              "
+            >
               <span>Subtotal</span>
-              <span>S/. {total.toFixed(2)}</span>
+
+              <span>
+                S/. {total.toFixed(2)}
+              </span>
             </div>
-            <div className="flex justify-between font-bold text-slate-800 text-sm">
-              <span>Total</span>
-              <span className="text-green-600">S/. {total.toFixed(2)}</span>
+
+            <div
+              className="
+                flex justify-between
+                text-xl font-bold
+                border-t border-slate-200
+                pt-3
+              "
+            >
+              <span className="text-slate-900">
+                Total
+              </span>
+
+              <span className="text-green-600">
+                S/. {total.toFixed(2)}
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5">
-            {paymentMethods.map((method) => (
-              <button
-                key={method.id}
-                onClick={() => setSelectedMethod(method.id)}
-                className={`flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                  selectedMethod === method.id
-                    ? method.id === 'postpago'
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-green-600 border-green-600 text-white'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
-                }`}
+          {/* Métodos */}
+          <div>
+            <p
+              className="
+                text-xs
+                font-bold
+                uppercase
+                text-slate-500
+                mb-3
+              "
+            >
+              Método de pago
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              {paymentMethods.map(
+                (method) => (
+                  <button
+                    key={method.id}
+                    onClick={() =>
+                      setSelectedMethod(
+                        method.id
+                      )
+                    }
+                    className={`
+                      flex flex-col items-center
+                      justify-center
+                      gap-2
+                      py-3 px-2
+                      rounded-xl
+                      border-2
+                      transition-all
+
+                      ${selectedMethod ===
+                        method.id
+                        ? method.id ===
+                          'postpago'
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-slate-300 text-slate-700 hover:border-green-400'
+                      }
+                    `}
+                  >
+                    {method.icon}
+
+                    <span className="text-xs font-semibold">
+                      {method.label}
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* PostPago */}
+          {selectedMethod ===
+            'postpago' &&
+            postPagoAccount && (
+              <div
+                className="
+                  border border-blue-100
+                  rounded-xl
+                  px-4 py-3
+                  text-sm
+                  space-y-2
+                  bg-blue-50
+                "
               >
-                {method.icon}
-                {method.label}
-              </button>
-            ))}
-          </div>
+                <p className="text-slate-500 text-xs uppercase font-semibold">
+                  Cuenta PostPago
+                </p>
 
-          {selectedMethod === 'postpago' && postPagoAccount && (
-            <div className="border border-blue-100 rounded-lg px-3 py-2 text-xs space-y-1.5">
-              <p className="text-slate-400 text-xs">Asociar cuenta postpago *</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    {postPagoAccount.name.charAt(0)}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="
+                        w-8 h-8
+                        rounded-full
+                        bg-blue-600
+                        text-white
+                        flex items-center justify-center
+                        font-bold
+                      "
+                    >
+                      {postPagoAccount.name.charAt(
+                        0
+                      )}
+                    </div>
+
+                    <span className="font-semibold text-slate-800">
+                      {
+                        postPagoAccount.name
+                      }
+                    </span>
                   </div>
-                  <span className="font-medium text-slate-700 text-xs">{postPagoAccount.name}</span>
                 </div>
-                <button className="text-slate-300 hover:text-slate-500 text-sm leading-none">×</button>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Deuda actual</span>
-                <span>S/. {postPagoAccount.currentDebt.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-semibold text-blue-600">
-                <span>Nueva deuda</span>
-                <span>S/. {(postPagoAccount.currentDebt + total).toFixed(2)} / {postPagoAccount.creditLimit}</span>
-              </div>
-              <div className="w-full bg-blue-100 rounded-full h-1.5">
-                <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(
-                      ((postPagoAccount.currentDebt + total) / postPagoAccount.creditLimit) * 100,
-                      100
-                    )}%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
 
+                <div className="flex justify-between text-slate-600">
+                  <span>
+                    Deuda actual
+                  </span>
+
+                  <span>
+                    S/.{' '}
+                    {postPagoAccount.currentDebt.toFixed(
+                      2
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex justify-between font-bold text-blue-700">
+                  <span>Nueva deuda</span>
+
+                  <span>
+                    S/.{' '}
+                    {(
+                      postPagoAccount.currentDebt +
+                      total
+                    ).toFixed(2)}{' '}
+                    /{' '}
+                    {
+                      postPagoAccount.creditLimit
+                    }
+                  </span>
+                </div>
+
+                <div
+                  className="
+                    w-full
+                    bg-blue-100
+                    rounded-full
+                    h-2
+                    overflow-hidden
+                  "
+                >
+                  <div
+                    className="
+                      bg-blue-600
+                      h-2
+                      rounded-full
+                      transition-all
+                    "
+                    style={{
+                      width: `${Math.min(
+                        ((postPagoAccount.currentDebt +
+                          total) /
+                          postPagoAccount.creditLimit) *
+                        100,
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+          {/* Checkout */}
           <button
             onClick={handleCobrar}
             disabled={!hasItems}
-            className={`w-full py-3 rounded-xl font-semibold text-sm text-white transition-colors ${
-              !hasItems
+            className={`
+              w-full
+              py-4
+              rounded-xl
+              font-bold
+              text-lg
+              text-white
+              transition-all
+              shadow-lg
+
+              ${!hasItems
                 ? 'bg-slate-300 cursor-not-allowed'
-                : selectedMethod === 'postpago'
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
+                : selectedMethod ===
+                  'postpago'
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+              }
+            `}
           >
-            Cobrar S/. {total.toFixed(2)}
-            {selectedMethod === 'postpago' ? ' · PostPago' : ''}
+            Cobrar S/.{' '}
+            {total.toFixed(2)}
           </button>
         </div>
       </div>
 
+      {/* ========================= */}
+      {/* MODALS */}
+      {/* ========================= */}
+
       {activeModal === 'efectivo' && (
-        <EfectivoModal items={items} total={total} onClose={() => setActiveModal(null)} onConfirm={handleConfirm} />
+        <EfectivoModal
+          items={items}
+          total={total}
+          onClose={() =>
+            setActiveModal(null)
+          }
+          onConfirm={handleConfirm}
+        />
       )}
+
       {activeModal === 'yape' && (
-        <YapeModal items={items} total={total} onClose={() => setActiveModal(null)} onConfirm={handleConfirm} />
+        <YapeModal
+          items={items}
+          total={total}
+          onClose={() =>
+            setActiveModal(null)
+          }
+          onConfirm={handleConfirm}
+        />
       )}
-      {activeModal === 'postpago' && postPagoAccount && (
-        <PostPagoModal items={items} total={total} account={postPagoAccount} onClose={() => setActiveModal(null)} onConfirm={handleConfirm} />
-      )}
+
+      {activeModal === 'postpago' &&
+        postPagoAccount && (
+          <PostPagoModal
+            items={items}
+            total={total}
+            account={postPagoAccount}
+            onClose={() =>
+              setActiveModal(null)
+            }
+            onConfirm={handleConfirm}
+          />
+        )}
     </>
   );
 }

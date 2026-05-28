@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { isUserAuthorized } from '@/lib/auth';
 
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
+import SidebarCajero from './components/SidebarCajero';
+import HeaderCajero from './components/HeaderCajero';
 
 import { toast } from 'sonner';
 
-export default function DashboardLayout({
+export default function CajeroLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -44,20 +43,9 @@ export default function DashboardLayout({
 
     const role = auth.instituciones[0]?.rol;
 
-    // Si es cajero → mandarlo a /cajero
-    if (role === 'CAJERO') {
-      router.push('/cajero');
-      return;
-    }
-
-    // Validar admin
-    const hasAccess = auth.instituciones.some((inst) =>
-      isUserAuthorized(inst.rol)
-    );
-
-    if (!hasAccess) {
-      toast.error('No autorizado');
-      router.push('/login');
+    // Solo cajero
+    if (role !== 'CAJERO') {
+      router.push('/dashboard');
       return;
     }
 
@@ -68,7 +56,7 @@ export default function DashboardLayout({
   if (isLoading || !authorized) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-100">
-        <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -80,7 +68,7 @@ export default function DashboardLayout({
     <div className="flex h-screen bg-slate-50">
 
       {/* SIDEBAR */}
-      <Sidebar
+      <SidebarCajero
         institutionName={institutionName}
         isCollapsed={isCollapsed}
         onCollapseChange={setIsCollapsed}
@@ -97,7 +85,7 @@ export default function DashboardLayout({
       >
 
         {/* HEADER */}
-        <Header
+        <HeaderCajero
           isCollapsed={isCollapsed}
           onMobileMenuToggle={() =>
             setIsMobileMenuOpen(!isMobileMenuOpen)

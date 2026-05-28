@@ -21,7 +21,10 @@ interface WeeklyRevenueChartProps {
   data?: RevenueData[];
 }
 
-export default function WeeklyRevenueChart({ data }: WeeklyRevenueChartProps) {
+export default function WeeklyRevenueChart({
+  data,
+}: WeeklyRevenueChartProps) {
+
   const defaultData: RevenueData[] = [
     { day: 'Lun', APP: 1800, POS: 700 },
     { day: 'Mar', APP: 2400, POS: 800 },
@@ -35,29 +38,133 @@ export default function WeeklyRevenueChart({ data }: WeeklyRevenueChartProps) {
   const chartData = data || defaultData;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-slate-900">Ingresos Semanales</h2>
-        <p className="text-sm text-slate-500">pedidos.monto_total - APP vs POS</p>
+    <div
+      className="
+        bg-white
+        rounded-2xl
+        shadow-sm
+        border border-slate-200
+        p-4 sm:p-6
+        overflow-hidden
+      "
+    >
+
+      {/* ======================== */}
+      {/* HEADER */}
+      {/* ======================== */}
+
+      <div className="mb-4 sm:mb-6">
+
+        <h2
+          className="
+            text-lg
+            sm:text-xl
+            font-bold
+            text-slate-900
+          "
+        >
+          Ingresos Semanales
+        </h2>
+
+        <p
+          className="
+            text-xs
+            sm:text-sm
+            text-slate-500
+            mt-1
+          "
+        >
+          pedidos.monto_total - APP vs POS
+        </p>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="day" stroke="#64748b" />
-          <YAxis stroke="#64748b" />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#fff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
+
+      {/* ======================== */}
+      {/* CHART */}
+      {/* ======================== */}
+
+      <div
+        className="
+          w-full
+          h-[280px]
+          sm:h-[320px]
+          md:h-[360px]
+        "
+      >
+        <ResponsiveContainer width="100%" height="100%">
+
+          <BarChart
+            data={chartData}
+            margin={{
+              top: 10,
+              right: 10,
+              left: -15,
+              bottom: 0,
             }}
-            cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-          />
-          <Legend />
-          <Bar dataKey="APP" fill="#a855f7" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="POS" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+          >
+
+            {/* Grid */}
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#e2e8f0"
+            />
+
+            {/* X */}
+            <XAxis
+              dataKey="day"
+              stroke="#64748b"
+              tick={{
+                fontSize: 12,
+                fill: '#64748b',
+              }}
+            />
+
+            {/* Y */}
+            <YAxis
+              stroke="#64748b"
+              tick={{
+                fontSize: 12,
+                fill: '#64748b',
+              }}
+            />
+
+            {/* Tooltip */}
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                color: '#0f172a',
+                fontSize: '14px',
+              }}
+              cursor={{
+                fill: 'rgba(0,0,0,0.04)',
+              }}
+            />
+
+            {/* Legend */}
+            <Legend
+              wrapperStyle={{
+                fontSize: '13px',
+                paddingTop: '10px',
+              }}
+            />
+
+            {/* APP */}
+            <Bar
+              dataKey="APP"
+              fill="#a855f7"
+              radius={[8, 8, 0, 0]}
+            />
+
+            {/* POS */}
+            <Bar
+              dataKey="POS"
+              fill="#06b6d4"
+              radius={[8, 8, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
