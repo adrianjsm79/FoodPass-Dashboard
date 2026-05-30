@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   Search, Plus, Pencil, Trash2, TriangleAlert, Tag,
   LayoutGrid, ToggleRight, ToggleLeft, Ticket, X, ImagePlus,
+  PowerOff,
 } from 'lucide-react';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -53,11 +54,22 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     throw new Error('Sesión expirada, vuelve a iniciar sesión');
   }
 
+  // DELETE puede devolver 204 sin body
+  if (res.status === 204) return null;
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error ?? body?.mensaje ?? body?.message ?? `Error ${res.status}`);
   }
-  return res.json();
+
+  // Algunas respuestas DELETE devuelven 200 con body vacío
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -83,32 +95,30 @@ interface Categoria {
   activo: boolean;
 }
 
-// ─── Mapper: respuesta backend → tipo interno ─────────────────────────────────
-// El backend devuelve: { id, nombre, descripcion, categoria, categoriaId,
-//   precio, stock, umbral, generaTicket, estado: 'activo'|'inactivo', imagen }
+// ─── Mapper ───────────────────────────────────────────────────────────────────
 
 function mapProducto(p: any): Producto {
   return {
     id:               p.id,
     nombre:           p.nombre,
     descripcion:      p.descripcion ?? null,
-    categoria_nombre: p.categoria  ?? '',          // backend: "categoria"
+    categoria_nombre: p.categoria ?? p.categoria_nombre ?? '',
     categoria_id:     p.categoriaId ?? p.categoria_id ?? '',
     precio:           parseFloat(p.precio),
-    stock_actual:     parseInt(p.stock ?? 0),
-    umbral_stock_bajo: parseInt(p.umbral ?? 5),
+    // ✅ FIX: el backend puede devolver "stock" o "stock_actual"
+    stock_actual:     parseInt(p.stock ?? p.stock_actual ?? 0),
+    umbral_stock_bajo: parseInt(p.umbral ?? p.umbral_stock_bajo ?? 5),
     genera_ticket:    p.generaTicket ?? p.genera_ticket ?? false,
     activo:           p.estado === 'activo' || p.activo === true,
-    imagen_url:       p.imagen ?? p.imagen_url ?? null, // backend: "imagen"
+    // ✅ FIX: el backend puede devolver "imagen" o "imagen_url"
+    imagen_url:       p.imagen ?? p.imagen_url ?? null,
   };
 }
 
 // ─── ImageUploader ────────────────────────────────────────────────────────────
 
 function ImageUploader({
-  value,
-  onChange,
-  size = 'md',
+  value, onChange, size = 'md',
 }: {
   value?: string;
   onChange: (v: string | undefined) => void;
@@ -119,46 +129,60 @@ function ImageUploader({
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result as string);
-    reader.readAsDataURL(file);
+    toast.error('No se admiten archivos locales. Ingresa una URL pública de imagen.');
+    e.target.value = '';
   };
 
-  const wrapCls =
-    size === 'sm' ? 'w-14 h-14 rounded-xl' : 'w-full h-32 rounded-xl';
+  const handleUrlChange = (newUrl: string) => {
+    onChange(newUrl.trim() || undefined);
+  };
+
+  const wrapCls = size === 'sm' ? 'w-14 h-14 rounded-xl' : 'w-full h-32 rounded-xl';
 
   return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      className={`relative flex items-center justify-center cursor-pointer border-2 border-dashed border-slate-200 bg-slate-50 hover:border-green-400 hover:bg-green-50 transition-colors overflow-hidden group ${wrapCls}`}
-    >
-      {value ? (
-        <>
-          <img src={value} alt="preview" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-            <ImagePlus size={14} className="text-white" />
-            {size !== 'sm' && <span className="text-white text-xs font-medium">Cambiar</span>}
+    <div className="space-y-2">
+      <div
+        onClick={() => inputRef.current?.click()}
+        className={`relative flex items-center justify-center cursor-pointer border-2 border-dashed border-slate-200 bg-slate-50 hover:border-green-400 hover:bg-green-50 transition-colors overflow-hidden group ${wrapCls}`}
+      >
+        {value ? (
+          <>
+            <img src={value} alt="preview" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+              <ImagePlus size={14} className="text-white" />
+              {size !== 'sm' && <span className="text-white text-xs font-medium">Cambiar</span>}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(undefined); }}
+              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            >
+              <X size={10} />
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-slate-400 group-hover:text-green-500 transition-colors">
+            <ImagePlus size={size === 'sm' ? 16 : 22} />
+            {size !== 'sm' && (
+              <>
+                <span className="text-xs font-medium">Subir imagen</span>
+                <span className="text-xs text-slate-300">JPG, PNG, WEBP</span>
+              </>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onChange(undefined); }}
-            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          >
-            <X size={10} />
-          </button>
-        </>
-      ) : (
-        <div className="flex flex-col items-center gap-1 text-slate-400 group-hover:text-green-500 transition-colors">
-          <ImagePlus size={size === 'sm' ? 16 : 22} />
-          {size !== 'sm' && (
-            <>
-              <span className="text-xs font-medium">Subir imagen</span>
-              <span className="text-xs text-slate-300">JPG, PNG, WEBP</span>
-            </>
-          )}
-        </div>
-      )}
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        )}
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+      <div className="space-y-1">
+        <input
+          type="url"
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+          placeholder="https://example.com/imagen.jpg"
+          value={value ?? ''}
+          onChange={(e) => handleUrlChange(e.target.value)}
+        />
+        <p className="text-[10px] text-slate-400">Usa una URL pública corta o deja el campo vacío.</p>
+      </div>
     </div>
   );
 }
@@ -190,7 +214,6 @@ function Thumbnail({
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
-      {/* En móvil el modal sube desde abajo (items-end); en sm+ se centra */}
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md sm:mx-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
@@ -221,7 +244,6 @@ function StatCard({ icon, value, label, sub, iconColor }: {
       <div className={`mb-2 ${iconColor}`}>{icon}</div>
       <p className="text-3xl font-bold text-slate-800 mb-1">{value}</p>
       <p className="text-sm text-slate-600">{label}</p>
-      {/* Ocultamos el subtítulo técnico en pantallas muy pequeñas */}
       <p className="text-xs text-slate-400 font-mono mt-0.5 hidden sm:block">{sub}</p>
     </div>
   );
@@ -231,7 +253,7 @@ function StatCard({ icon, value, label, sub, iconColor }: {
 
 const emptyProductoForm = () => ({
   nombre: '', descripcion: '', categoria_id: '', precio: '',
-  stock_inicial: '', umbral: '', genera_ticket: false, activo: true,
+  stock: '', umbral: '', genera_ticket: false, activo: true,
   imagen_url: undefined as string | undefined,
 });
 
@@ -239,6 +261,13 @@ const emptyCategoriaForm = () => ({
   nombre: '',
   imagen_url: undefined as string | undefined,
 });
+
+// ─── Tipos para el confirm dialog ─────────────────────────────────────────────
+
+type ConfirmAction =
+  | { tipo: 'desactivar-producto'; id: string; nombre: string }
+  | { tipo: 'eliminar-producto';   id: string; nombre: string }
+  | { tipo: 'eliminar-categoria';  id: string; nombre: string };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -259,13 +288,10 @@ export default function ProductosPage() {
   const [editingCat,   setEditingCat]   = useState<Categoria | null>(null);
   const [formCat,      setFormCat]      = useState(emptyCategoriaForm());
 
-  const [confirmDelete, setConfirmDelete] = useState<{
-    tipo: 'producto' | 'categoria'; id: string; nombre: string;
-  } | null>(null);
+  // ✅ FIX: el confirm ahora distingue desactivar / eliminar producto / eliminar categoría
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  useEffect(() => { cargarDatos(); }, []);
-
-  const cargarDatos = async () => {
+  async function cargarDatos() {
     setIsLoading(true);
     try {
       const [catsRaw, prodsRaw] = await Promise.all([
@@ -273,13 +299,12 @@ export default function ProductosPage() {
         apiFetch(`/instituciones/${INST_ID}/productos`),
       ]);
 
-      // Categorías — backend devuelve: { id, nombre, icono, activo }
-      // Puede que imagen esté en "icono" si aún no migraste, o en "imagen_url"
+      // ✅ FIX: mapeamos imagen desde "icono" o "imagen_url" según lo que devuelva el backend
       const cats: Categoria[] = catsRaw.map((c: any) => ({
-        id:        c.id,
-        nombre:    c.nombre,
-        imagen_url: c.imagen_url ?? c.icono ?? null,
-        activo:    c.activo,
+        id:         c.id,
+        nombre:     c.nombre,
+        imagen_url: c.imagen_url ?? c.icono ?? c.imagen ?? null,
+        activo:     c.activo ?? c.estado === 'activo',
       }));
 
       setCategorias(cats);
@@ -289,7 +314,11 @@ export default function ProductosPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    void cargarDatos(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
 
   const total         = productos.length;
   const activos       = productos.filter((p) => p.activo).length;
@@ -311,7 +340,8 @@ export default function ProductosPage() {
       descripcion:   p.descripcion ?? '',
       categoria_id:  p.categoria_id,
       precio:        String(p.precio),
-      stock_inicial: String(p.stock_actual),
+      // ✅ FIX: cargamos el stock real al editar
+      stock:         String(p.stock_actual),
       umbral:        String(p.umbral_stock_bajo),
       genera_ticket: p.genera_ticket,
       activo:        p.activo,
@@ -327,28 +357,41 @@ export default function ProductosPage() {
 
     setSaving(true);
     try {
-      const body = {
+      const stockValue = parseInt(formProd.stock) || 0;
+
+      const body: Record<string, any> = {
         nombre:        formProd.nombre.trim(),
         descripcion:   formProd.descripcion.trim() || null,
         categoria_id:  formProd.categoria_id,
         precio:        parseFloat(formProd.precio),
         genera_ticket: formProd.genera_ticket,
         activo:        formProd.activo,
+        imagen:        formProd.imagen_url ?? null,
         imagen_url:    formProd.imagen_url ?? null,
-        stock_inicial: parseInt(formProd.stock_inicial) || 0,
+        umbral:        parseInt(formProd.umbral) || 5,
       };
 
       if (editingProd) {
+        // al editar enviamos el stock real al backend.
+        body.stock_actual = stockValue;
+        body.stock        = stockValue;
+
         await apiFetch(`/instituciones/${INST_ID}/productos/${editingProd.id}`, {
           method: 'PATCH', body: JSON.stringify(body),
         });
         toast.success('Producto actualizado');
       } else {
+        // al crear enviamos stock_inicial y stock_actual para que el backend lo registre.
+        body.stock_inicial = stockValue;
+        body.stock_actual  = stockValue;
+        body.stock         = stockValue;
+
         await apiFetch(`/instituciones/${INST_ID}/productos`, {
           method: 'POST', body: JSON.stringify(body),
         });
         toast.success('Producto creado');
       }
+
       setShowModalProd(false);
       cargarDatos();
     } catch (e: any) {
@@ -358,22 +401,43 @@ export default function ProductosPage() {
     }
   };
 
+  // ✅ FIX: desactivar (toggle estado) → no elimina, solo cambia activo
+  const handleDesactivarProd = async (id: string) => {
+    try {
+      await apiFetch(`/instituciones/${INST_ID}/productos/${id}`, {
+        method: 'PATCH', body: JSON.stringify({ activo: false }),
+      });
+      toast.success('Producto desactivado');
+      setConfirmAction(null);
+      cargarDatos();
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al desactivar');
+    }
+  };
+
+  // ✅ FIX: eliminar definitivo → DELETE real
   const handleEliminarProd = async (id: string) => {
     try {
       await apiFetch(`/instituciones/${INST_ID}/productos/${id}`, { method: 'DELETE' });
-      toast.success('Producto desactivado');
-      setConfirmDelete(null);
+      toast.success('Producto eliminado');
+      setConfirmAction(null);
+      setProductos((prev) => prev.filter((p) => p.id !== id));
       cargarDatos();
-    } catch (e: any) { toast.error(e.message ?? 'Error al eliminar'); }
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al eliminar');
+    }
   };
 
+  // Toggle estado (activo/inactivo) directo desde la tabla
   const toggleEstado = async (p: Producto) => {
     try {
       await apiFetch(`/instituciones/${INST_ID}/productos/${p.id}`, {
         method: 'PATCH', body: JSON.stringify({ activo: !p.activo }),
       });
       cargarDatos();
-    } catch (e: any) { toast.error(e.message ?? 'Error al cambiar estado'); }
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al cambiar estado');
+    }
   };
 
   // ─── Handlers: Categoría ─────────────────────────────────────────────────
@@ -394,7 +458,23 @@ export default function ProductosPage() {
     if (!formCat.nombre.trim()) return toast.error('El nombre es requerido');
     setSaving(true);
     try {
-      const body = { nombre: formCat.nombre.trim(), imagen_url: formCat.imagen_url ?? null };
+      const imageValue = formCat.imagen_url;
+      const safeImage = typeof imageValue === 'string' && !imageValue.startsWith('data:') && imageValue.length <= 100
+        ? imageValue
+        : undefined;
+
+      if (imageValue && !safeImage) {
+        toast.warning('La imagen no se guardará porque excede el límite del backend.');
+      }
+
+      const body: Record<string, unknown> = {
+        nombre: formCat.nombre.trim(),
+      };
+      if (safeImage) {
+        body.icono = safeImage;
+        body.imagen_url = safeImage;
+      }
+
       if (editingCat) {
         await apiFetch(`/instituciones/${INST_ID}/categorias/${editingCat.id}`, {
           method: 'PATCH', body: JSON.stringify(body),
@@ -415,13 +495,17 @@ export default function ProductosPage() {
     }
   };
 
+  // ✅ FIX: eliminar categoría → DELETE real (no solo desactivar)
   const handleEliminarCat = async (id: string) => {
     try {
       await apiFetch(`/instituciones/${INST_ID}/categorias/${id}`, { method: 'DELETE' });
-      toast.success('Categoría desactivada');
-      setConfirmDelete(null);
+      toast.success('Categoría eliminada');
+      setConfirmAction(null);
+      setCategorias((prev) => prev.filter((c) => c.id !== id));
       cargarDatos();
-    } catch (e: any) { toast.error(e.message ?? 'Error al eliminar'); }
+    } catch (e: any) {
+      toast.error(e.message ?? 'Error al eliminar');
+    }
   };
 
   const filteredProductos = productos.filter((p) => {
@@ -432,11 +516,108 @@ export default function ProductosPage() {
     return matchCat && matchSearch;
   });
 
+  // ─── Confirm dialog content ───────────────────────────────────────────────
+
+  const renderConfirm = () => {
+    if (!confirmAction) return null;
+
+    if (confirmAction.tipo === 'desactivar-producto') {
+      return (
+        <Modal title="Desactivar producto" onClose={() => setConfirmAction(null)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-xl border border-orange-100">
+              <PowerOff size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-orange-700">
+                  ¿Desactivar este producto?
+                </p>
+                <p className="text-xs text-orange-500 mt-1">
+                  <strong>"{confirmAction.nombre}"</strong> quedará inactivo pero podrás reactivarlo después desde la tabla.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmAction(null)}
+                className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => handleDesactivarProd(confirmAction.id)}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                Sí, desactivar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+
+    if (confirmAction.tipo === 'eliminar-producto') {
+      return (
+        <Modal title="Eliminar producto" onClose={() => setConfirmAction(null)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
+              <TriangleAlert size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-700">
+                  ¿Eliminar este producto definitivamente?
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  <strong>"{confirmAction.nombre}"</strong> se borrará de forma permanente y no podrás recuperarlo.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmAction(null)}
+                className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => handleEliminarProd(confirmAction.id)}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+
+    if (confirmAction.tipo === 'eliminar-categoria') {
+      return (
+        <Modal title="Eliminar categoría" onClose={() => setConfirmAction(null)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
+              <TriangleAlert size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-700">
+                  ¿Eliminar esta categoría definitivamente?
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  <strong>"{confirmAction.nombre}"</strong> se borrará de forma permanente. Asegúrate de que no tenga productos asignados.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmAction(null)}
+                className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => handleEliminarCat(confirmAction.id)}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
-    /* ─── Padding adaptativo: compacto en móvil, cómodo en desktop ─── */
     <div className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-5">
 
-      {/* Stats — 2 columnas en móvil/tablet, 4 en desktop */}
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard icon={<LayoutGrid size={20}    />} value={total}         label="Total Productos"  sub="en catálogo"             iconColor="text-blue-500"   />
         <StatCard icon={<ToggleRight size={20}   />} value={activos}       label="Activos"          sub="disponibles para venta"  iconColor="text-green-500"  />
@@ -472,14 +653,9 @@ export default function ProductosPage() {
       {/* ══════════ Tab: Productos ══════════ */}
       {!isLoading && activeTab === 'productos' && (
         <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-5">
-
-          {/* Toolbar: se apila en móvil, inline en md+ */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <h2 className="text-sm font-semibold text-slate-800">Catálogo</h2>
-
-            {/* Controles de búsqueda/filtro — fila en sm+, columna en xs */}
             <div className="flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center gap-2">
-              {/* Buscador: ocupa ancho completo en móvil, fijo en sm+ */}
               <div className="relative w-full sm:w-48">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -488,8 +664,6 @@ export default function ProductosPage() {
                   className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
-              {/* Selector de categoría */}
               <select
                 value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
                 className="w-full sm:w-auto border border-slate-200 rounded-lg text-xs text-slate-600 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
@@ -497,8 +671,6 @@ export default function ProductosPage() {
                 <option value="todas">Todas las categorías</option>
                 {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
-
-              {/* Botón nuevo producto */}
               <button
                 onClick={openNuevoProd}
                 className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
@@ -508,9 +680,8 @@ export default function ProductosPage() {
             </div>
           </div>
 
-          {/* Tabla con scroll horizontal en pantallas pequeñas */}
           <div className="overflow-x-auto -mx-3 sm:mx-0">
-            <div className="min-w-[600px] px-3 sm:px-0">
+            <div className="min-w-[640px] px-3 sm:px-0">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-100">
@@ -565,13 +736,26 @@ export default function ProductosPage() {
                             {prod.activo ? 'Activo' : 'Inactivo'}
                           </button>
                         </td>
+                        {/* ✅ FIX: 3 acciones → editar, desactivar, eliminar */}
                         <td className="py-3">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => openEditarProd(prod)} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEditarProd(prod)}
+                              title="Editar"
+                              className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
                               <Pencil size={13} />
                             </button>
                             <button
-                              onClick={() => setConfirmDelete({ tipo: 'producto', id: prod.id, nombre: prod.nombre })}
+                              onClick={() => setConfirmAction({ tipo: 'desactivar-producto', id: prod.id, nombre: prod.nombre })}
+                              title="Desactivar"
+                              className="p-1 text-slate-400 hover:text-orange-500 transition-colors"
+                            >
+                              <PowerOff size={13} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmAction({ tipo: 'eliminar-producto', id: prod.id, nombre: prod.nombre })}
+                              title="Eliminar"
                               className="p-1 text-slate-400 hover:text-red-500 transition-colors"
                             >
                               <Trash2 size={13} />
@@ -605,15 +789,17 @@ export default function ProductosPage() {
             </button>
           </div>
 
-          {/* Grid: 1 columna en móvil, 2 en sm+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {categorias.map((cat) => {
               const count = productos.filter((p) => p.categoria_id === cat.id).length;
               return (
                 <div key={cat.id} className="flex items-center justify-between border border-slate-200 rounded-xl p-3 hover:border-slate-300 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
+                    {/* ✅ FIX: Thumbnail usa imagen_url que ya fue mapeada correctamente */}
                     <Thumbnail
-                      imagen={cat.imagen_url} nombre={cat.nombre} size="md"
+                      imagen={cat.imagen_url}
+                      nombre={cat.nombre}
+                      size="md"
                       fallbackIcon={<Tag size={14} className="text-slate-400" />}
                     />
                     <div className="min-w-0">
@@ -622,11 +808,15 @@ export default function ProductosPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <button onClick={() => openEditarCat(cat)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+                    <button
+                      onClick={() => openEditarCat(cat)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
                       <Pencil size={13} />
                     </button>
+                    {/* ✅ FIX: eliminar categoría de verdad */}
                     <button
-                      onClick={() => setConfirmDelete({ tipo: 'categoria', id: cat.id, nombre: cat.nombre })}
+                      onClick={() => setConfirmAction({ tipo: 'eliminar-categoria', id: cat.id, nombre: cat.nombre })}
                       className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                     >
                       <Trash2 size={13} />
@@ -649,7 +839,8 @@ export default function ProductosPage() {
             <div className="flex gap-3 items-start">
               <div className="flex-shrink-0">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Imagen</label>
-                <ImageUploader size="sm" value={formProd.imagen_url} onChange={(img) => setFormProd((p) => ({ ...p, imagen_url: img }))} />
+                <ImageUploader size="sm" value={formProd.imagen_url}
+                  onChange={(img) => setFormProd((p) => ({ ...p, imagen_url: img }))} />
               </div>
               <div className="flex-1 min-w-0">
                 <Field label="Nombre *">
@@ -658,10 +849,12 @@ export default function ProductosPage() {
                 </Field>
               </div>
             </div>
+
             <Field label="Descripción">
               <input className={inputCls} placeholder="Descripción breve" value={formProd.descripcion}
                 onChange={(e) => setFormProd((p) => ({ ...p, descripcion: e.target.value }))} />
             </Field>
+
             <Field label="Categoría *">
               <select className={inputCls} value={formProd.categoria_id}
                 onChange={(e) => setFormProd((p) => ({ ...p, categoria_id: e.target.value }))}>
@@ -670,21 +863,23 @@ export default function ProductosPage() {
               </select>
             </Field>
 
-            {/* Campos numéricos: 1 columna en móvil, 2-3 en sm+ */}
-            <div className={`grid gap-3 ${editingProd ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
+            {/* ✅ FIX: 3 columnas siempre (precio, stock, alerta) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field label="Precio (S/.) *">
                 <input type="number" min="0" step="0.01" className={inputCls} placeholder="0.00"
-                  value={formProd.precio} onChange={(e) => setFormProd((p) => ({ ...p, precio: e.target.value }))} />
+                  value={formProd.precio}
+                  onChange={(e) => setFormProd((p) => ({ ...p, precio: e.target.value }))} />
               </Field>
-              {!editingProd && (
-                <Field label="Stock inicial">
-                  <input type="number" min="0" className={inputCls} placeholder="0"
-                    value={formProd.stock_inicial} onChange={(e) => setFormProd((p) => ({ ...p, stock_inicial: e.target.value }))} />
-                </Field>
-              )}
+              {/* ✅ FIX: campo stock siempre visible (stock_inicial al crear, stock al editar) */}
+              <Field label={editingProd ? 'Stock actual' : 'Stock inicial'}>
+                <input type="number" min="0" className={inputCls} placeholder="0"
+                  value={formProd.stock}
+                  onChange={(e) => setFormProd((p) => ({ ...p, stock: e.target.value }))} />
+              </Field>
               <Field label="Alerta stock">
                 <input type="number" min="0" className={inputCls} placeholder="5"
-                  value={formProd.umbral} onChange={(e) => setFormProd((p) => ({ ...p, umbral: e.target.value }))} />
+                  value={formProd.umbral}
+                  onChange={(e) => setFormProd((p) => ({ ...p, umbral: e.target.value }))} />
               </Field>
             </div>
 
@@ -700,6 +895,7 @@ export default function ProductosPage() {
                 <span className="text-xs text-slate-600 font-medium">Activo</span>
               </label>
             </div>
+
             <div className="flex gap-2 pt-1">
               <button onClick={() => setShowModalProd(false)}
                 className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
@@ -722,11 +918,12 @@ export default function ProductosPage() {
             <div className="flex gap-3 items-start">
               <div className="flex-shrink-0">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Imagen</label>
-                <ImageUploader size="sm" value={formCat.imagen_url} onChange={(img) => setFormCat((p) => ({ ...p, imagen_url: img }))} />
+                <ImageUploader size="sm" value={formCat.imagen_url}
+                  onChange={(img) => setFormCat((p) => ({ ...p, imagen_url: img }))} />
               </div>
               <div className="flex-1 min-w-0">
                 <Field label="Nombre *">
-                  <input className={inputCls} placeholder="Ej: Menús, Bebidas, Snacks" value={formCat.nombre}
+                  <input className={inputCls} placeholder="Ej: Menús, Bebidas, Snacks" maxLength={100} value={formCat.nombre}
                     onChange={(e) => setFormCat((p) => ({ ...p, nombre: e.target.value }))} />
                 </Field>
               </div>
@@ -745,37 +942,8 @@ export default function ProductosPage() {
         </Modal>
       )}
 
-      {/* ══════════ Modal: Confirmar ══════════ */}
-      {confirmDelete && (
-        <Modal title="Confirmar" onClose={() => setConfirmDelete(null)}>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
-              <TriangleAlert size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-red-700">
-                  ¿Desactivar {confirmDelete.tipo === 'producto' ? 'este producto' : 'esta categoría'}?
-                </p>
-                <p className="text-xs text-red-500 mt-1">
-                  <strong>"{confirmDelete.nombre}"</strong> quedará inactivo pero no se borrará.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
-                Cancelar
-              </button>
-              <button
-                onClick={() => confirmDelete.tipo === 'producto'
-                  ? handleEliminarProd(confirmDelete.id)
-                  : handleEliminarCat(confirmDelete.id)}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-                Sí, desactivar
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* ══════════ Modales de confirmación ══════════ */}
+      {renderConfirm()}
     </div>
   );
 }

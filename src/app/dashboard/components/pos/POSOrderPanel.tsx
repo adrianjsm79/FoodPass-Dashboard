@@ -25,7 +25,7 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  imagen?: string;
+  imagen?: string | null;
 }
 
 type PaymentMethod =

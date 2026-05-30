@@ -9,7 +9,7 @@ export interface Product {
   stock: number;
   category: string;
   generaTicket?: boolean;
-  imagen?: string;
+  imagen?: string | null;
 }
 
 interface ProductCardProps {

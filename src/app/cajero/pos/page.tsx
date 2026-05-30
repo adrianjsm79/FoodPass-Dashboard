@@ -1,642 +1,257 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  ShoppingCart,
-  Plus,
-  Minus,
-  Trash2,
-  CreditCard,
-  Wallet,
-  DollarSign,
-} from 'lucide-react';
-
+import { useEffect, useState } from 'react';
+import { Search, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import CategoryFilter from '../../dashboard/components/pos/CategoryFilter';
+import ProductCard, { Product } from '../../dashboard/components/pos/ProductCard';
+import POSOrderPanel, { CartItem } from '../../dashboard/components/pos/POSOrderPanel';
 
-interface Product {
+interface ProductoAPI {
   id: string;
-  name: string;
-  price: number;
-  category: string;
-  stock: number;
-  calories?: number;
+  nombre: string;
+  precio: string | number;
+  stock?: string | number;
+  stock_actual?: string | number;
+  categoria?: string;
+  categoria_nombre?: string;
+  generaTicket?: boolean;
+  genera_ticket?: boolean;
+  imagen?: string | null;
+  imagen_url?: string | null;
+  estado?: string;
+  activo?: boolean;
 }
 
-interface CartItem {
-  productId: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
 export default function CajeroPOS() {
+  const { auth } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState('Menús');
+  const institutionId = auth?.instituciones?.[0]?.id ?? '';
+  const token = auth?.accessToken ?? '';
 
-  const [paymentMethod, setPaymentMethod] = useState<
-    'cash' | 'yape' | 'card'
-  >('cash');
+  useEffect(() => {
+    if (!institutionId || !token) return;
 
-  const products: Product[] = [
-    {
-      id: '1',
-      name: 'Menú Ejecutivo',
-      price: 18.5,
-      category: 'Menús',
-      stock: 12,
-      calories: 850,
-    },
-    {
-      id: '2',
-      name: 'Menú Estándar',
-      price: 12.0,
-      category: 'Menús',
-      stock: 25,
-      calories: 750,
-    },
-    {
-      id: '3',
-      name: 'Snack Paquete',
-      price: 8.5,
-      category: 'Snacks',
-      stock: 15,
-      calories: 400,
-    },
-    {
-      id: '4',
-      name: 'Sandwich',
-      price: 6.0,
-      category: 'Snacks',
-      stock: 20,
-      calories: 350,
-    },
-    {
-      id: '5',
-      name: 'Inca Kola',
-      price: 2.5,
-      category: 'Bebidas',
-      stock: 30,
-      calories: 140,
-    },
-    {
-      id: '6',
-      name: 'Agua Embotellada',
-      price: 1.5,
-      category: 'Bebidas',
-      stock: 50,
-      calories: 0,
-    },
-  ];
+    const cargarProductos = async () => {
+      setIsLoading(true);
 
-  const categories = [
-    'Menús',
-    'Snacks',
-    'Bebidas',
-  ];
+      try {
+        const res = await fetch(`${API_URL}/instituciones/${institutionId}/productos`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error ?? body?.mensaje ?? `Error ${res.status}`);
+        }
+
+        const data = (await res.json()) as ProductoAPI[];
+
+        const productsFormatted: Product[] = data
+          .filter((p) => p.estado === 'activo' || p.activo === true)
+          .map((p) => ({
+            id: p.id,
+            name: p.nombre,
+            price: Number(p.precio),
+            stock: Number(p.stock ?? p.stock_actual ?? 0),
+            category: p.categoria ?? p.categoria_nombre ?? 'Sin categoria',
+            generaTicket: p.generaTicket ?? p.genera_ticket ?? false,
+            imagen: p.imagen ?? p.imagen_url ?? null,
+          }));
+
+        setProducts(productsFormatted);
+
+        const uniqueCategories = [
+          ...new Set(productsFormatted.map((p) => p.category).filter(Boolean)),
+        ].sort() as string[];
+
+        setCategories(uniqueCategories);
+      } catch (error: unknown) {
+        console.error('Error:', error);
+        toast.error(error instanceof Error ? error.message : 'Error al cargar productos');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    cargarProductos();
+  }, [institutionId, token]);
+
+  const categoriesWithAll = ['Todas', ...categories];
 
   const filteredProducts = products.filter(
-    (p) => p.category === selectedCategory
+    (product) =>
+      (selectedCategory === 'Todas' || product.category === selectedCategory) &&
+      product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const addToCart = (product: Product) => {
+  const getCartQuantity = (productId: string) =>
+    cartItems.find((item) => item.productId === productId)?.quantity ?? 0;
+
+  const handleAddToCart = (product: Product) => {
     if (product.stock <= 0) {
       toast.error('Producto sin stock');
       return;
     }
 
-    const existing = cartItems.find(
-      (item) => item.productId === product.id
-    );
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.productId === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
 
-    if (existing) {
-      setCartItems(
-        cartItems.map((item) =>
-          item.productId === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-              }
-            : item
-        )
-      );
-    } else {
-      setCartItems([
-        ...cartItems,
+      return [
+        ...prev,
         {
           productId: product.id,
           name: product.name,
           price: product.price,
           quantity: 1,
+          imagen: product.imagen,
         },
-      ]);
-    }
+      ];
+    });
   };
 
-  const updateQuantity = (
-    productId: string,
-    quantity: number
-  ) => {
+  const handleQuantityChange = (productId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      handleRemoveItem(productId);
       return;
     }
 
-    setCartItems(
-      cartItems.map((item) =>
-        item.productId === productId
-          ? {
-              ...item,
-              quantity,
-            }
-          : item
-      )
+    setCartItems((prev) =>
+      prev.map((item) => (item.productId === productId ? { ...item, quantity } : item))
     );
   };
 
-  const removeFromCart = (productId: string) => {
-    setCartItems(
-      cartItems.filter(
-        (item) => item.productId !== productId
-      )
-    );
+  const handleRemoveItem = (productId: string) => {
+    setCartItems((prev) => prev.filter((item) => item.productId !== productId));
   };
 
-  const total = cartItems.reduce(
-    (sum, item) =>
-      sum + item.price * item.quantity,
-    0
-  );
-
-  const handleCheckout = () => {
-    if (cartItems.length === 0) {
-      toast.error('El carrito está vacío');
-      return;
-    }
-
-    const methodLabel = {
-      cash: 'Efectivo',
-      yape: 'Yape',
-      card: 'Tarjeta',
-    }[paymentMethod];
-
-    toast.success(
-      `Venta registrada: S/. ${total.toFixed(
-        2
-      )} - ${methodLabel}`
-    );
-
+  const handleVaciar = () => {
     setCartItems([]);
   };
 
+  const handlePayment = async (method: 'efectivo' | 'yape' | 'postpago') => {
+    if (cartItems.length === 0) return;
+
+    try {
+      const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const res = await fetch(`${API_URL}/instituciones/${institutionId}/pedidos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          canal: 'POS',
+          metodo_pago: method,
+          items: cartItems.map((item) => ({
+            producto_id: item.productId,
+            cantidad: item.quantity,
+            precio_unitario: item.price,
+          })),
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? body?.mensaje ?? `Error ${res.status}`);
+      }
+
+      toast.success(`Pago procesado: ${method.toUpperCase()} - S/. ${total.toFixed(2)}`);
+      setCartItems([]);
+      setSearchTerm('');
+      setSelectedCategory('Todas');
+    } catch (error: unknown) {
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al procesar el pago');
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-
-      {/* ======================= */}
-      {/* HEADER */}
-      {/* ======================= */}
-
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl p-4 sm:p-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <ShoppingCart
-            size={28}
-            className="sm:w-8 sm:h-8"
-          />
-
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            Punto de Venta
-          </h1>
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
+      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl p-6 shadow-lg mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <ShoppingCart size={30} />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Punto de Venta</h1>
+              <p className="text-green-100 text-sm sm:text-base">Vende rapido y facil</p>
+            </div>
+          </div>
         </div>
-
-        <p className="text-green-100 text-sm sm:text-base">
-          Vende rápido y fácil
-        </p>
       </div>
 
-      {/* ======================= */}
-      {/* CONTENIDO */}
-      {/* ======================= */}
-
       <div className="flex flex-col xl:flex-row gap-6">
-
-        {/* ======================= */}
-        {/* PRODUCTOS */}
-        {/* ======================= */}
-
-        <div className="flex-1 min-w-0">
-
-          {/* Categorías */}
-          <div className="flex flex-wrap gap-2 mb-5">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() =>
-                  setSelectedCategory(cat)
-                }
-                className={`
-                  px-4 py-2
-                  rounded-xl
-                  text-sm sm:text-base
-                  font-semibold
-                  transition-all duration-200
-
-                  ${
-                    selectedCategory === cat
-                      ? 'bg-green-600 text-white shadow-lg'
-                      : 'bg-white border border-slate-300 text-slate-800 hover:border-green-400'
-                  }
-                `}
-              >
-                {cat}
-              </button>
-            ))}
+        <div className="flex-1 min-w-0 space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                placeholder="Buscar producto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
           </div>
 
-          {/* GRID */}
-          <div
-            className="
-              grid
-              grid-cols-1
-              sm:grid-cols-2
-              2xl:grid-cols-3
-              gap-4
-            "
-          >
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                onClick={() =>
-                  product.stock > 0 &&
-                  addToCart(product)
-                }
-                className={`
-                  rounded-2xl
-                  border
-                  overflow-hidden
-                  transition-all duration-300
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <CategoryFilter
+              categories={categoriesWithAll}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+            />
+          </div>
 
-                  ${
-                    product.stock === 0
-                      ? 'bg-slate-100 border-slate-200 opacity-50 cursor-not-allowed'
-                      : 'bg-white border-slate-200 hover:border-green-400 hover:shadow-xl cursor-pointer'
-                  }
-                `}
-              >
-                <div className="p-4">
-
-                  {/* Imagen */}
-                  <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl aspect-square flex items-center justify-center mb-4">
-                    <ShoppingCart
-                      size={42}
-                      className="text-green-600"
-                    />
-                  </div>
-
-                  {/* Nombre */}
-                  <h3 className="font-bold text-slate-900 text-base sm:text-lg line-clamp-2">
-                    {product.name}
-                  </h3>
-
-                  {/* Precio */}
-                  <p className="text-2xl font-bold text-green-600 mt-3">
-                    S/. {product.price.toFixed(2)}
-                  </p>
-
-                  {/* Stock */}
-                  <p className="text-sm text-slate-600 mt-1">
-                    Stock: {product.stock}
-                  </p>
-
-                  {/* Botón */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToCart(product);
-                    }}
-                    disabled={product.stock === 0}
-                    className="
-                      mt-4
-                      w-full
-                      bg-green-600
-                      hover:bg-green-700
-                      disabled:bg-slate-300
-                      text-white
-                      py-3
-                      rounded-xl
-                      font-semibold
-                      transition
-                      flex items-center justify-center gap-2
-                    "
-                  >
-                    <Plus
-                      size={18}
-                      className="text-white"
-                    />
-
-                    Agregar
-                  </button>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {isLoading ? (
+              <div className="col-span-full bg-white border border-slate-200 rounded-2xl py-20 text-center">
+                <p className="text-slate-500">Cargando productos...</p>
               </div>
-            ))}
+            ) : filteredProducts.length > 0 ? (
+              filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  cartQuantity={getCartQuantity(product.id)}
+                  onAddToCart={handleAddToCart}
+                />
+              ))
+            ) : (
+              <div className="col-span-full bg-white border border-slate-200 rounded-2xl py-20 text-center">
+                <p className="text-slate-500">No hay productos disponibles</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ======================= */}
-        {/* CARRITO */}
-        {/* ======================= */}
-
-        <div
-          className="
-            w-full
-            xl:w-[360px]
-            bg-white
-            rounded-2xl
-            shadow-lg
-            border border-slate-200
-            overflow-hidden
-            flex flex-col
-            h-fit
-            xl:sticky
-            xl:top-6
-          "
-        >
-
-          {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">
-                Carrito
-              </h2>
-
-              <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                {cartItems.length} item
-                {cartItems.length !== 1
-                  ? 's'
-                  : ''}
-              </span>
-            </div>
-          </div>
-
-          {/* Lista */}
-          <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
-
-            {cartItems.length === 0 ? (
-              <div className="py-12 text-center">
-                <ShoppingCart
-                  size={52}
-                  className="mx-auto mb-3 text-slate-300"
-                />
-
-                <p className="text-slate-500">
-                  Carrito vacío
-                </p>
-              </div>
-            ) : (
-              cartItems.map((item) => (
-                <div
-                  key={item.productId}
-                  className="bg-slate-50 border border-slate-200 rounded-xl p-4"
-                >
-
-                  {/* Top */}
-                  <div className="flex justify-between gap-3">
-
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 break-words">
-                        {item.name}
-                      </p>
-
-                      <p className="text-green-600 font-bold mt-1">
-                        S/.{' '}
-                        {(
-                          item.price *
-                          item.quantity
-                        ).toFixed(2)}
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        removeFromCart(
-                          item.productId
-                        )
-                      }
-                      className="
-                        text-red-500
-                        hover:text-red-700
-                        transition
-                        flex items-center justify-center
-                      "
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-
-                  {/* Cantidad */}
-                  <div className="flex items-center gap-3 mt-4">
-
-                    {/* Minus */}
-                    <button
-                      onClick={() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity - 1
-                        )
-                      }
-                      className="
-                        w-10 h-10
-                        rounded-lg
-                        border border-slate-300
-                        bg-white
-                        hover:bg-slate-100
-                        flex items-center justify-center
-                        transition
-                      "
-                    >
-                      <Minus
-                        size={18}
-                        className="text-slate-800"
-                        strokeWidth={2.5}
-                      />
-                    </button>
-
-                    {/* Quantity */}
-                    <span className="font-bold text-lg text-slate-900 min-w-[24px] text-center">
-                      {item.quantity}
-                    </span>
-
-                    {/* Plus */}
-                    <button
-                      onClick={() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity + 1
-                        )
-                      }
-                      className="
-                        w-10 h-10
-                        rounded-lg
-                        border border-slate-300
-                        bg-white
-                        hover:bg-slate-100
-                        flex items-center justify-center
-                        transition
-                      "
-                    >
-                      <Plus
-                        size={18}
-                        className="text-slate-800"
-                        strokeWidth={2.5}
-                      />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-slate-200 p-4 space-y-5">
-
-            {/* Totales */}
-            <div className="space-y-2">
-
-              <div className="flex justify-between text-slate-700">
-                <span>Subtotal</span>
-
-                <span>
-                  S/. {total.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex justify-between text-xl font-bold border-t border-slate-200 pt-3">
-                <span className="text-slate-900">
-                  Total
-                </span>
-
-                <span className="text-green-600">
-                  S/. {total.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {/* Métodos */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-500 mb-3">
-                Método de pago
-              </p>
-
-              <div className="grid grid-cols-3 gap-2">
-
-                {(
-                  [
-                    'cash',
-                    'yape',
-                    'card',
-                  ] as const
-                ).map((method) => {
-
-                  const icons = {
-                    cash: (
-                      <Wallet size={20} />
-                    ),
-                    yape: (
-                      <CreditCard size={20} />
-                    ),
-                    card: (
-                      <DollarSign size={20} />
-                    ),
-                  };
-
-                  const labels = {
-                    cash: 'Efectivo',
-                    yape: 'Yape',
-                    card: 'Tarjeta',
-                  };
-
-                  return (
-                    <button
-                      key={method}
-                      onClick={() =>
-                        setPaymentMethod(
-                          method
-                        )
-                      }
-                      className={`
-                        flex flex-col
-                        items-center
-                        justify-center
-                        gap-2
-                        py-3 px-2
-                        rounded-xl
-                        border-2
-                        transition-all
-
-                        ${
-                          paymentMethod ===
-                          method
-                            ? 'border-green-600 bg-green-50 text-green-700'
-                            : 'border-slate-300 text-slate-700 hover:border-green-400'
-                        }
-                      `}
-                    >
-                      {icons[method]}
-
-                      <span className="text-xs font-semibold">
-                        {labels[method]}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Checkout */}
-            <button
-              onClick={handleCheckout}
-              disabled={
-                cartItems.length === 0
-              }
-              className="
-                w-full
-                bg-gradient-to-r
-                from-green-600
-                to-green-700
-                hover:from-green-700
-                hover:to-green-800
-                disabled:from-slate-300
-                disabled:to-slate-300
-                disabled:cursor-not-allowed
-                text-white
-                py-4
-                rounded-xl
-                font-bold
-                text-lg
-                transition-all
-                shadow-lg
-              "
-            >
-              Cobrar S/.{' '}
-              {total.toFixed(2)}
-            </button>
-
-            {/* Limpiar */}
-            <button
-              onClick={() =>
-                setCartItems([])
-              }
-              className="
-                w-full
-                text-slate-700
-                hover:text-slate-900
-                font-semibold
-                py-2
-                transition
-              "
-            >
-              Limpiar Carrito
-            </button>
+        <div className="w-full xl:w-[380px]">
+          <div className="sticky top-6">
+            <POSOrderPanel
+              items={cartItems}
+              onQuantityChange={handleQuantityChange}
+              onRemoveItem={handleRemoveItem}
+              onVaciar={handleVaciar}
+              onPayment={handlePayment}
+            />
           </div>
         </div>
       </div>
