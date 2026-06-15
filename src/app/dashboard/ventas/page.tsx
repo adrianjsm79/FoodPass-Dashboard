@@ -12,6 +12,7 @@ import ProductCard, {
 import POSOrderPanel, {
   CartItem,
 } from '../components/pos/POSOrderPanel';
+import { PostPagoAccount } from '../components/pos/PaymentModals';
 
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -85,25 +86,28 @@ export default function VentasPage() {
     CartItem[]
   >([]);
 
+  const [postpagoAccounts, setPostpagoAccounts] = useState<PostPagoAccount[]>([]);
+
   const [isLoading, setIsLoading] =
     useState(true);
 
   useEffect(() => {
     if (instId) {
-      cargarProductos();
+      cargarDatos();
     }
   }, [instId]);
 
-  const cargarProductos = async () => {
+  const cargarDatos = async () => {
     if (!instId) return;
     try {
       setIsLoading(true);
 
-      const data = await apiFetch(
-        `/instituciones/${instId}/productos`
-      );
+      const [productosData, cuentasData] = await Promise.all([
+        apiFetch(`/instituciones/${instId}/productos`),
+        apiFetch(`/instituciones/${instId}/postpago/cuentas`)
+      ]);
 
-      const productsFormatted: Product[] = data
+      const productsFormatted: Product[] = productosData
         .filter(
           (p: any) => p.estado === 'activo'
         )
@@ -132,12 +136,22 @@ export default function VentasPage() {
       if (uniqueCategories.length > 0) {
         setSelectedCategory(uniqueCategories[0]);
       }
+
+      const formattedAccounts: PostPagoAccount[] = cuentasData.map((c: any) => ({
+        id: c.id,
+        name: c.nombre_completo,
+        accountCode: c.correo,
+        currentDebt: parseFloat(c.saldo_deuda),
+        creditLimit: parseFloat(c.limite_credito)
+      }));
+      setPostpagoAccounts(formattedAccounts);
+      
     } catch (error: any) {
       console.error('Error:', error);
 
       toast.error(
         error.message ??
-          'Error al cargar productos'
+          'Error al cargar datos'
       );
     } finally {
       setIsLoading(false);
@@ -229,7 +243,8 @@ export default function VentasPage() {
     method:
       | 'efectivo'
       | 'yape'
-      | 'postpago'
+      | 'postpago',
+    cuenta_postpago_id?: string
   ) => {
     if (cartItems.length === 0) return;
 
@@ -240,19 +255,25 @@ export default function VentasPage() {
         0
       );
 
+      const payload: any = {
+        canal: 'POS',
+        metodo_pago: method,
+        items: cartItems.map((item) => ({
+          producto_id: item.productId,
+          cantidad: item.quantity,
+          precio_unitario: item.price,
+        })),
+      };
+
+      if (method === 'postpago') {
+        payload.cuenta_postpago_id = cuenta_postpago_id;
+      }
+
       await apiFetch(
         `/instituciones/${instId}/pedidos`,
         {
           method: 'POST',
-          body: JSON.stringify({
-            canal: 'POS',
-            metodo_pago: method,
-            items: cartItems.map((item) => ({
-              producto_id: item.productId,
-              cantidad: item.quantity,
-              precio_unitario: item.price,
-            })),
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -264,7 +285,7 @@ export default function VentasPage() {
 
       setCartItems([]);
 
-      cargarProductos();
+      cargarDatos();
     } catch (error: any) {
       console.error('Error:', error);
 
@@ -492,6 +513,7 @@ export default function VentasPage() {
       >
         <POSOrderPanel
           items={cartItems}
+          postPagoAccounts={postpagoAccounts}
           onQuantityChange={
             handleQuantityChange
           }

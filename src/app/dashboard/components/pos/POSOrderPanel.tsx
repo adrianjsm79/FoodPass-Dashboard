@@ -36,7 +36,7 @@ type PaymentMethod =
 interface POSOrderPanelProps {
   items: CartItem[];
 
-  postPagoAccount?: PostPagoAccount | null;
+  postPagoAccounts?: PostPagoAccount[];
 
   onQuantityChange: (
     productId: string,
@@ -50,23 +50,14 @@ interface POSOrderPanelProps {
   onVaciar: () => void;
 
   onPayment: (
-    method: PaymentMethod
+    method: PaymentMethod,
+    cuenta_postpago_id?: string
   ) => void;
 }
 
-const DEMO_POSTPAGO_ACCOUNT: PostPagoAccount =
-{
-  id: 'cp1',
-  name: 'Carlos Ríos',
-  accountCode: 'cp1',
-  currentDebt: 48.5,
-  creditLimit: 200,
-};
-
 export default function POSOrderPanel({
   items,
-  postPagoAccount =
-  DEMO_POSTPAGO_ACCOUNT,
+  postPagoAccounts = [],
   onQuantityChange,
   onRemoveItem,
   onVaciar,
@@ -94,8 +85,8 @@ export default function POSOrderPanel({
     setActiveModal(selectedMethod);
   };
 
-  const handleConfirm = () => {
-    onPayment(selectedMethod);
+  const handleConfirm = (cuenta_postpago_id?: string) => {
+    onPayment(selectedMethod, cuenta_postpago_id);
 
     setActiveModal(null);
   };
@@ -493,107 +484,7 @@ export default function POSOrderPanel({
             </div>
           </div>
 
-          {/* PostPago */}
-          {selectedMethod ===
-            'postpago' &&
-            postPagoAccount && (
-              <div
-                className="
-                  border border-blue-100
-                  rounded-xl
-                  px-4 py-3
-                  text-sm
-                  space-y-2
-                  bg-blue-50
-                "
-              >
-                <p className="text-slate-500 text-xs uppercase font-semibold">
-                  Cuenta PostPago
-                </p>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="
-                        w-8 h-8
-                        rounded-full
-                        bg-blue-600
-                        text-white
-                        flex items-center justify-center
-                        font-bold
-                      "
-                    >
-                      {postPagoAccount.name.charAt(
-                        0
-                      )}
-                    </div>
-
-                    <span className="font-semibold text-slate-800">
-                      {
-                        postPagoAccount.name
-                      }
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between text-slate-600">
-                  <span>
-                    Deuda actual
-                  </span>
-
-                  <span>
-                    S/.{' '}
-                    {postPagoAccount.currentDebt.toFixed(
-                      2
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex justify-between font-bold text-blue-700">
-                  <span>Nueva deuda</span>
-
-                  <span>
-                    S/.{' '}
-                    {(
-                      postPagoAccount.currentDebt +
-                      total
-                    ).toFixed(2)}{' '}
-                    /{' '}
-                    {
-                      postPagoAccount.creditLimit
-                    }
-                  </span>
-                </div>
-
-                <div
-                  className="
-                    w-full
-                    bg-blue-100
-                    rounded-full
-                    h-2
-                    overflow-hidden
-                  "
-                >
-                  <div
-                    className="
-                      bg-blue-600
-                      h-2
-                      rounded-full
-                      transition-all
-                    "
-                    style={{
-                      width: `${Math.min(
-                        ((postPagoAccount.currentDebt +
-                          total) /
-                          postPagoAccount.creditLimit) *
-                        100,
-                        100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
+          {/* PostPago Info Placeholder (Removed to simplify, modal handles it) */}
 
           {/* Checkout */}
           <button
@@ -650,18 +541,17 @@ export default function POSOrderPanel({
         />
       )}
 
-      {activeModal === 'postpago' &&
-        postPagoAccount && (
-          <PostPagoModal
-            items={items}
-            total={total}
-            account={postPagoAccount}
-            onClose={() =>
-              setActiveModal(null)
-            }
-            onConfirm={handleConfirm}
-          />
-        )}
+      {activeModal === 'postpago' && (
+        <PostPagoModal
+          items={items}
+          total={total}
+          accounts={postPagoAccounts}
+          onClose={() =>
+            setActiveModal(null)
+          }
+          onConfirm={(cuentaId) => handleConfirm(cuentaId)}
+        />
+      )}
     </>
   );
 }

@@ -204,81 +204,129 @@ export interface PostPagoAccount {
 interface PostPagoModalProps {
   items: CartItem[];
   total: number;
-  account: PostPagoAccount;
+  accounts: PostPagoAccount[];
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (cuentaId: string) => void;
 }
 
 export function PostPagoModal({
   items,
   total,
-  account,
+  accounts,
   onClose,
   onConfirm,
 }: PostPagoModalProps) {
-  const newDebt = account.currentDebt + total;
-  const usedPercent = Math.min((newDebt / account.creditLimit) * 100, 100);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+
+  const filteredAccounts = accounts.filter(acc => 
+    acc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    acc.accountCode.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const account = accounts.find(a => a.id === selectedAccountId);
+
+  const newDebt = account ? account.currentDebt + total : 0;
+  const usedPercent = account ? Math.min((newDebt / account.creditLimit) * 100, 100) : 0;
 
   return (
     <ModalWrapper
-      title="Confirmar Pago"
-      subtitle="transacciones_postpago · tipo=CARGO"
+      title="Confirmar Pago PostPago"
+      subtitle="Seleccione cuenta para registrar cargo"
       onClose={onClose}
     >
       <OrderSummary items={items} total={total} />
 
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
-              {account.name.charAt(0)}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-800">{account.name}</p>
-            <p className="text-xs text-slate-400">
-              cuentas_postpago · {account.accountCode}
-            </p>
+      {!account ? (
+        <div className="mb-4">
+          <label className="text-sm font-medium text-slate-600 flex items-center gap-1 mb-2">
+            Buscar empleado / cuenta
+          </label>
+          <input
+            type="text"
+            placeholder="Nombre o correo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+          />
+          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+            {filteredAccounts.length > 0 ? (
+              filteredAccounts.map(acc => (
+                <button
+                  key={acc.id}
+                  onClick={() => setSelectedAccountId(acc.id)}
+                  className="w-full text-left bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-lg p-3 transition-colors"
+                >
+                  <p className="font-semibold text-slate-800 text-sm">{acc.name}</p>
+                  <p className="text-xs text-slate-500">{acc.accountCode}</p>
+                </button>
+              ))
+            ) : (
+              <p className="text-xs text-slate-500 text-center py-4">No se encontraron cuentas</p>
+            )}
           </div>
         </div>
+      ) : (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">
+                  {account.name.charAt(0)}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{account.name}</p>
+                <p className="text-xs text-slate-400">
+                  {account.accountCode}
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setSelectedAccountId(null)}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Cambiar
+            </button>
+          </div>
 
-        <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-slate-600">
-            <span>Deuda actual</span>
-            <span>S/. {account.currentDebt.toFixed(2)}</span>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>Deuda actual</span>
+              <span>S/. {account.currentDebt.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>+ Este cargo</span>
+              <span className="text-green-600 font-medium">S/. {total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-blue-200 mt-1">
+              <span>Nueva deuda</span>
+              <span className="text-blue-600">S/. {newDebt.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="flex justify-between text-slate-600">
-            <span>+ Este cargo (CARGO)</span>
-            <span className="text-green-600 font-medium">S/. {total.toFixed(2)}</span>
+
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
+              <span>Límite de crédito</span>
+              <span>S/. {account.creditLimit.toFixed(2)}</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${usedPercent > 90 ? 'bg-red-500' : 'bg-blue-500'}`}
+                style={{ width: `${usedPercent}%` }}
+              />
+            </div>
           </div>
-          <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-blue-200 mt-1">
-            <span>Nueva deuda</span>
-            <span className="text-blue-600">S/. {newDebt.toFixed(2)}</span>
-          </div>
+          {newDebt > account.creditLimit && (
+            <p className="text-xs text-red-600 mt-2 font-medium">El nuevo saldo excederá el límite de crédito</p>
+          )}
         </div>
-
-        <div className="mt-3">
-          <div className="flex justify-between text-xs text-slate-500 mb-1">
-            <span>Límite de crédito</span>
-            <span>S/. {account.creditLimit.toFixed(2)}</span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full transition-all"
-              style={{ width: `${usedPercent}%` }}
-            />
-          </div>
-          <p className="text-xs text-slate-400 mt-1">{Math.round(usedPercent)}% del límite utilizado</p>
-        </div>
-      </div>
-
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-xs text-yellow-700 mb-4">
-        Se registrará un <strong>CARGO</strong> en transacciones_postpago. El descuento se aplicará desde RRHH.
-      </div>
+      )}
 
       <button
-        onClick={onConfirm}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+        onClick={() => account && onConfirm(account.id)}
+        disabled={!account}
+        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
       >
         <CheckCircle size={16} />
         Registrar Cargo PostPago
