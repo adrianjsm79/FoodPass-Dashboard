@@ -125,7 +125,7 @@ interface YapeModalProps {
   items: CartItem[];
   total: number;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (referencia?: string) => void;
 }
 
 export function YapeModal({ items, total, onClose, onConfirm }: YapeModalProps) {
@@ -181,7 +181,7 @@ export function YapeModal({ items, total, onClose, onConfirm }: YapeModalProps) 
       </div>
 
       <button
-        onClick={onConfirm}
+        onClick={() => onConfirm(codigo || undefined)}
         className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
       >
         <CheckCircle size={16} />

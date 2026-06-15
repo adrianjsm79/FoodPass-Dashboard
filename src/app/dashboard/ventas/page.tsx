@@ -244,7 +244,7 @@ export default function VentasPage() {
       | 'efectivo'
       | 'yape'
       | 'postpago',
-    cuenta_postpago_id?: string
+    options?: { cuenta_postpago_id?: string; referencia_externa?: string }
   ) => {
     if (cartItems.length === 0) return;
 
@@ -265,8 +265,12 @@ export default function VentasPage() {
         })),
       };
 
-      if (method === 'postpago') {
-        payload.cuenta_postpago_id = cuenta_postpago_id;
+      if (method === 'postpago' && options?.cuenta_postpago_id) {
+        payload.cuenta_postpago_id = options.cuenta_postpago_id;
+      }
+
+      if (options?.referencia_externa) {
+        payload.referencia_externa = options.referencia_externa;
       }
 
       await apiFetch(

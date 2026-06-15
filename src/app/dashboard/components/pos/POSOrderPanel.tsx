@@ -51,7 +51,7 @@ interface POSOrderPanelProps {
 
   onPayment: (
     method: PaymentMethod,
-    cuenta_postpago_id?: string
+    options?: { cuenta_postpago_id?: string; referencia_externa?: string }
   ) => void;
 }
 
@@ -85,8 +85,8 @@ export default function POSOrderPanel({
     setActiveModal(selectedMethod);
   };
 
-  const handleConfirm = (cuenta_postpago_id?: string) => {
-    onPayment(selectedMethod, cuenta_postpago_id);
+  const handleConfirm = (opciones?: { cuenta_postpago_id?: string; referencia_externa?: string }) => {
+    onPayment(selectedMethod, opciones);
 
     setActiveModal(null);
   };
@@ -537,7 +537,7 @@ export default function POSOrderPanel({
           onClose={() =>
             setActiveModal(null)
           }
-          onConfirm={handleConfirm}
+          onConfirm={(referencia) => handleConfirm({ referencia_externa: referencia })}
         />
       )}
 
@@ -549,7 +549,7 @@ export default function POSOrderPanel({
           onClose={() =>
             setActiveModal(null)
           }
-          onConfirm={(cuentaId) => handleConfirm(cuentaId)}
+          onConfirm={(cuentaId) => handleConfirm({ cuenta_postpago_id: cuentaId })}
         />
       )}
     </>
