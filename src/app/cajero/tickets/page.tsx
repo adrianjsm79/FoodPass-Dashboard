@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Ticket,
   QrCode,
@@ -10,230 +10,263 @@ import {
   Clock,
   User,
   Calendar,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface ValidatedTicket {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TicketDetalle {
   id: string;
-  code: string;
-  userName: string;
-  menuType: string;
-  status: 'active' | 'used' | 'expired';
-  purchaseDate: Date;
-  expirationDate: Date;
-  validatedAt?: Date;
+  codigo: string;
+  estado: 'VIGENTE' | 'CANJEADO' | 'EXPIRADO';
+  expira_en: string;
+  canjeado_en: string | null;
+  creado_en: string;
+  nombre_usuario: string | null;
+  nombre_producto: string;
+  canal: 'APP' | 'POS';
+  pedido_fecha?: string;
 }
 
-interface ValidationResult {
-  ticket: ValidatedTicket;
-  isValid: boolean;
-  message: string;
+interface CanjeResult {
+  ticket_id: string;
+  codigo: string;
+  estado: string;
+  nombre_producto: string;
+  nombre_usuario: string | null;
+  canjeado_en: string;
 }
+
+interface ValidatedEntry {
+  id: string;
+  codigo: string;
+  nombre_usuario: string | null;
+  nombre_producto: string;
+  validatedAt: Date;
+}
+
+// ─── Auth helper ──────────────────────────────────────────────────────────────
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
+
+function getAuth(): { accessToken: string; institucionId: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('foodpass_auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const inst = (parsed.instituciones ?? []).find(
+      (i: { rol: string }) => i.rol !== 'USUARIO'
+    ) ?? parsed.instituciones?.[0];
+    return {
+      accessToken: parsed.accessToken ?? '',
+      institucionId: inst?.id ?? '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const auth = getAuth();
+  if (!auth?.accessToken) throw new Error('No hay sesión activa');
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${auth.accessToken}`,
+      ...(options?.headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.message ?? body?.mensaje ?? body?.error ?? `Error ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+function getInstitucionId(): string {
+  return getAuth()?.institucionId ?? '';
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatFechaCompleta(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PE', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }) + ' ' + d.toLocaleTimeString('es-PE', {
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TicketsModule() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTicket, setSelectedTicket] =
-    useState<ValidatedTicket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<TicketDetalle | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  const [validationResult, setValidationResult] =
-    useState<ValidationResult | null>(null);
+  const [validationMessage, setValidationMessage] = useState<{ isValid: boolean; message: string } | null>(null);
+  const [canjeLoading, setCanjeLoading] = useState(false);
 
-  const [validatedTickets, setValidatedTickets] = useState<
-    ValidatedTicket[]
-  >([]);
+  const [validatedTickets, setValidatedTickets] = useState<ValidatedEntry[]>([]);
+  const [rejectedCount, setRejectedCount] = useState(0);
 
   const [showQRScanner, setShowQRScanner] = useState(false);
-
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const mockTickets: ValidatedTicket[] = [
-    {
-      id: '1',
-      code: 'TKT-2026-001',
-      userName: 'Juan Pérez',
-      menuType: 'Menú Ejecutivo',
-      status: 'active',
-      purchaseDate: new Date(
-        Date.now() - 2 * 24 * 60 * 60 * 1000
-      ),
-      expirationDate: new Date(
-        Date.now() + 5 * 24 * 60 * 60 * 1000
-      ),
-    },
-    {
-      id: '2',
-      code: 'TKT-2026-002',
-      userName: 'María García',
-      menuType: 'Menú Estándar',
-      status: 'used',
-      purchaseDate: new Date(
-        Date.now() - 1 * 24 * 60 * 60 * 1000
-      ),
-      expirationDate: new Date(
-        Date.now() + 6 * 24 * 60 * 60 * 1000
-      ),
-      validatedAt: new Date(
-        Date.now() - 2 * 60 * 60 * 1000
-      ),
-    },
-    {
-      id: '3',
-      code: 'TKT-2026-003',
-      userName: 'Carlos López',
-      menuType: 'Snack Pack',
-      status: 'expired',
-      purchaseDate: new Date(
-        Date.now() - 10 * 24 * 60 * 60 * 1000
-      ),
-      expirationDate: new Date(
-        Date.now() - 2 * 24 * 60 * 60 * 1000
-      ),
-    },
-  ];
+  // ── Stats from real data ──
+  const [totalToday, setTotalToday] = useState(0);
+  const fetchTodayStats = useCallback(async () => {
+    try {
+      const institucionId = getInstitucionId();
+      if (!institucionId) return;
+      const today = new Date().toISOString().split('T')[0];
+      const data = await apiFetch<TicketDetalle[]>(
+        `/instituciones/${institucionId}/tickets?desde=${today}&limit=200`
+      );
+      setTotalToday(data.length);
+    } catch {
+      // silent
+    }
+  }, []);
 
-  const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      toast.error('Ingresa un código o nombre');
+  useEffect(() => {
+    fetchTodayStats();
+  }, [fetchTodayStats]);
+
+  // ── Search ──
+  const handleSearch = async () => {
+    const code = searchQuery.trim().toUpperCase();
+    if (!code) {
+      toast.error('Ingresa un código');
       return;
     }
 
-    const found = mockTickets.find(
-      (t) =>
-        t.code
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        t.userName
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-    );
+    setSearchLoading(true);
+    setValidationMessage(null);
+    setSelectedTicket(null);
 
-    if (found) {
-      setSelectedTicket(found);
-      setValidationResult(null);
-    } else {
-      toast.error('Ticket no encontrado');
+    try {
+      const institucionId = getInstitucionId();
+      const ticket = await apiFetch<TicketDetalle>(
+        `/instituciones/${institucionId}/tickets/buscar/${encodeURIComponent(code)}`
+      );
+      setSelectedTicket(ticket);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error';
+      toast.error(msg.includes('no encontrado') ? 'Ticket no encontrado' : msg);
       setSelectedTicket(null);
+    } finally {
+      setSearchLoading(false);
     }
   };
 
-  const handleValidateTicket = () => {
+  // ── Validate & Canjear ──
+  const handleValidateTicket = async () => {
     if (!selectedTicket) return;
 
-    const now = new Date();
-
-    let isValid = true;
-    let message = '';
-
-    if (selectedTicket.status === 'used') {
-      isValid = false;
-      message = '❌ Este ticket ya fue utilizado';
-    } else if (
-      selectedTicket.status === 'expired'
-    ) {
-      isValid = false;
-      message = '⏰ Este ticket expiró';
-    } else if (
-      selectedTicket.expirationDate < now
-    ) {
-      isValid = false;
-      message = '⏰ Este ticket expiró';
-    } else {
-      isValid = true;
-      message =
-        '✅ Ticket válido - Acceso permitido';
+    if (selectedTicket.estado === 'CANJEADO') {
+      setValidationMessage({ isValid: false, message: '❌ Este ticket ya fue canjeado' });
+      setRejectedCount((p) => p + 1);
+      return;
     }
 
-    setValidationResult({
-      ticket: selectedTicket,
-      isValid,
-      message,
-    });
+    if (selectedTicket.estado === 'EXPIRADO' || new Date(selectedTicket.expira_en) < new Date()) {
+      setValidationMessage({ isValid: false, message: '⏰ Este ticket expiró' });
+      setRejectedCount((p) => p + 1);
+      return;
+    }
 
-    if (isValid) {
-      const updatedTicket = {
-        ...selectedTicket,
-        status: 'used' as const,
-        validatedAt: new Date(),
-      };
+    // Ticket is VIGENTE → canjear via API
+    setCanjeLoading(true);
+    try {
+      const institucionId = getInstitucionId();
+      const result = await apiFetch<CanjeResult>(
+        `/instituciones/${institucionId}/tickets/${encodeURIComponent(selectedTicket.codigo)}/canjear`,
+        { method: 'POST' }
+      );
 
-      setValidatedTickets([
-        ...validatedTickets,
-        updatedTicket,
+      setValidationMessage({ isValid: true, message: '✅ Ticket válido - Acceso permitido' });
+
+      setValidatedTickets((prev) => [
+        ...prev,
+        {
+          id: result.ticket_id,
+          codigo: result.codigo,
+          nombre_usuario: result.nombre_usuario,
+          nombre_producto: result.nombre_producto,
+          validatedAt: new Date(result.canjeado_en),
+        },
       ]);
 
-      toast.success(
-        'Ticket validado correctamente'
+      setSelectedTicket((prev) =>
+        prev ? { ...prev, estado: 'CANJEADO', canjeado_en: result.canjeado_en } : prev
       );
+
+      toast.success('Ticket validado correctamente');
 
       setTimeout(() => {
         setSelectedTicket(null);
-        setValidationResult(null);
+        setValidationMessage(null);
         setSearchQuery('');
       }, 2000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al canjear';
+      setValidationMessage({ isValid: false, message: `❌ ${msg}` });
+      setRejectedCount((p) => p + 1);
+    } finally {
+      setCanjeLoading(false);
     }
   };
 
+  // ── QR Scanner ──
   const startQRScanner = async () => {
     setShowQRScanner(true);
-
     try {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-          },
-        });
-
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch {
-      toast.error(
-        'No se pudo acceder a la cámara'
-      );
+      toast.error('No se pudo acceder a la cámara');
       setShowQRScanner(false);
     }
   };
 
   const stopQRScanner = () => {
     setShowQRScanner(false);
-
-    if (
-      videoRef.current &&
-      videoRef.current.srcObject
-    ) {
-      const tracks = (
-        videoRef.current
-          .srcObject as MediaStream
-      ).getTracks();
-
-      tracks.forEach((track) =>
-        track.stop()
-      );
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((track) => track.stop());
     }
   };
 
-  const getStatusBadge = (
-    status: string
-  ) => {
+  // ── Status badge ──
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case 'VIGENTE':
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-            <CheckCircle size={14} />
-            Activo
+            <Clock size={14} />
+            Vigente
           </span>
         );
-
-      case 'used':
+      case 'CANJEADO':
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
             <CheckCircle size={14} />
-            Usado
+            Canjeado
           </span>
         );
-
-      case 'expired':
+      case 'EXPIRADO':
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
             <AlertCircle size={14} />
@@ -253,14 +286,12 @@ export default function TicketsModule() {
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl p-5 md:p-6 shadow-lg">
         <div className="flex items-center gap-3 mb-2">
           <Ticket size={30} />
-
           <h1 className="text-2xl md:text-3xl font-bold">
             Validación de Tickets
           </h1>
         </div>
-
         <p className="text-green-100 text-sm md:text-base">
-          Valida tickets digitales y controla el acceso
+          Valida tickets digitales generados desde la App Móvil
         </p>
       </div>
 
@@ -290,27 +321,18 @@ export default function TicketsModule() {
 
               {/* INPUT + BUTTON */}
               <div className="flex flex-col sm:flex-row gap-3">
-
                 <div className="flex-1 relative">
-
                   <Search
                     size={18}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
-
                   <input
                     type="text"
-                    placeholder="Código o nombre..."
+                    placeholder="Código del ticket (FP-XXXX-XXXX)..."
                     value={searchQuery}
-                    onChange={(e) =>
-                      setSearchQuery(
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSearch();
-                      }
+                      if (e.key === 'Enter') handleSearch();
                     }}
                     className="
                       w-full
@@ -329,17 +351,21 @@ export default function TicketsModule() {
 
                 <button
                   onClick={handleSearch}
+                  disabled={searchLoading}
                   className="
                     w-full sm:w-auto
                     px-6 py-3
                     bg-green-600
                     hover:bg-green-700
+                    disabled:opacity-60
                     text-white
                     rounded-xl
                     font-medium
                     transition
+                    flex items-center justify-center gap-2
                   "
                 >
+                  {searchLoading && <Loader2 size={16} className="animate-spin" />}
                   Buscar
                 </button>
               </div>
@@ -364,7 +390,6 @@ export default function TicketsModule() {
                 </button>
               ) : (
                 <div className="space-y-3">
-
                   <div className="aspect-square max-w-sm mx-auto bg-slate-900 rounded-xl overflow-hidden">
                     <video
                       ref={videoRef}
@@ -373,7 +398,6 @@ export default function TicketsModule() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-
                   <button
                     onClick={stopQRScanner}
                     className="
@@ -409,14 +433,12 @@ export default function TicketsModule() {
 
                 {/* ROW */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase">
                       Código
                     </p>
-
                     <p className="text-lg font-bold text-slate-900 mt-1 break-all">
-                      {selectedTicket.code}
+                      {selectedTicket.codigo}
                     </p>
                   </div>
 
@@ -424,11 +446,8 @@ export default function TicketsModule() {
                     <p className="text-xs font-semibold text-slate-500 uppercase">
                       Estado
                     </p>
-
                     <div className="mt-1">
-                      {getStatusBadge(
-                        selectedTicket.status
-                      )}
+                      {getStatusBadge(selectedTicket.estado)}
                     </div>
                   </div>
                 </div>
@@ -439,36 +458,30 @@ export default function TicketsModule() {
                     <User size={14} />
                     Cliente
                   </p>
-
                   <p className="text-lg font-semibold text-slate-900 mt-1">
-                    {selectedTicket.userName}
+                    {selectedTicket.nombre_usuario ?? 'Anónimo'}
                   </p>
                 </div>
 
-                {/* MENU */}
+                {/* PRODUCTO */}
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase">
-                    Tipo de Menú
+                    Producto
                   </p>
-
                   <p className="text-lg font-semibold text-slate-900 mt-1">
-                    {selectedTicket.menuType}
+                    {selectedTicket.nombre_producto}
                   </p>
                 </div>
 
                 {/* FECHAS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
                       <Calendar size={14} />
-                      Comprado
+                      Creado
                     </p>
-
                     <p className="text-sm text-slate-900 mt-1">
-                      {selectedTicket.purchaseDate.toLocaleDateString(
-                        'es-ES'
-                      )}
+                      {formatFechaCompleta(selectedTicket.creado_en)}
                     </p>
                   </div>
 
@@ -477,22 +490,19 @@ export default function TicketsModule() {
                       <Clock size={14} />
                       Expira
                     </p>
-
                     <p className="text-sm text-slate-900 mt-1">
-                      {selectedTicket.expirationDate.toLocaleDateString(
-                        'es-ES'
-                      )}
+                      {formatFechaCompleta(selectedTicket.expira_en)}
                     </p>
                   </div>
                 </div>
 
                 {/* RESULTADO */}
-                {validationResult && (
+                {validationMessage && (
                   <div
                     className={`
                       p-4 rounded-xl border
                       ${
-                        validationResult.isValid
+                        validationMessage.isValid
                           ? 'bg-green-50 border-green-200'
                           : 'bg-red-50 border-red-200'
                       }
@@ -502,13 +512,13 @@ export default function TicketsModule() {
                       className={`
                         text-center font-bold text-lg
                         ${
-                          validationResult.isValid
+                          validationMessage.isValid
                             ? 'text-green-700'
                             : 'text-red-700'
                         }
                       `}
                     >
-                      {validationResult.message}
+                      {validationMessage.message}
                     </p>
                   </div>
                 )}
@@ -516,9 +526,7 @@ export default function TicketsModule() {
                 {/* BUTTON */}
                 <button
                   onClick={handleValidateTicket}
-                  disabled={
-                    validationResult?.isValid === true
-                  }
+                  disabled={validationMessage?.isValid === true || canjeLoading}
                   className={`
                     w-full
                     py-3
@@ -526,18 +534,21 @@ export default function TicketsModule() {
                     font-bold
                     text-white
                     transition
+                    flex items-center justify-center gap-2
 
                     ${
-                      validationResult?.isValid ===
-                      true
+                      validationMessage?.isValid === true
                         ? 'bg-green-600 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700'
                     }
+                    disabled:opacity-70
                   `}
                 >
-                  {validationResult?.isValid ===
-                  true
+                  {canjeLoading && <Loader2 size={16} className="animate-spin" />}
+                  {validationMessage?.isValid === true
                     ? '✓ Acceso Permitido'
+                    : canjeLoading
+                    ? 'Validando…'
                     : 'Validar Ticket'}
                 </button>
               </div>
@@ -562,9 +573,8 @@ export default function TicketsModule() {
 
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <span className="text-slate-600">
-                  Validados
+                  Validados (sesión)
                 </span>
-
                 <span className="text-2xl font-bold text-green-600">
                   {validatedTickets.length}
                 </span>
@@ -572,11 +582,10 @@ export default function TicketsModule() {
 
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <span className="text-slate-600">
-                  Rechazados
+                  Rechazados (sesión)
                 </span>
-
                 <span className="text-2xl font-bold text-red-600">
-                  2
+                  {rejectedCount}
                 </span>
               </div>
 
@@ -584,13 +593,11 @@ export default function TicketsModule() {
                 <span className="text-slate-600">
                   Tasa Éxito
                 </span>
-
                 <span className="text-2xl font-bold text-green-600">
-                  {validatedTickets.length > 0
+                  {(validatedTickets.length + rejectedCount) > 0
                     ? Math.round(
                         (validatedTickets.length /
-                          (validatedTickets.length +
-                            2)) *
+                          (validatedTickets.length + rejectedCount)) *
                           100
                       )
                     : 0}
@@ -622,22 +629,22 @@ export default function TicketsModule() {
                     className="p-4 hover:bg-slate-50 transition"
                   >
                     <p className="font-medium text-slate-900 text-sm">
-                      {ticket.userName}
+                      {ticket.nombre_usuario ?? 'Anónimo'}
                     </p>
 
                     <p className="text-xs text-slate-500 mt-1">
-                      {ticket.code} •{' '}
-                      {ticket.menuType}
+                      {ticket.codigo} •{' '}
+                      {ticket.nombre_producto}
                     </p>
 
-                    {ticket.validatedAt && (
-                      <p className="text-xs text-green-600 mt-1">
-                        ✓{' '}
-                        {ticket.validatedAt.toLocaleTimeString(
-                          'es-ES'
-                        )}
-                      </p>
-                    )}
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓{' '}
+                      {ticket.validatedAt.toLocaleTimeString('es-PE', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </p>
                   </div>
                 ))
               )}
