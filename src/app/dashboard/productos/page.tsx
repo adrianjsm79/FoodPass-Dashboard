@@ -422,13 +422,16 @@ export default function ProductosPage() {
     }
   };
 
-  // ✅ FIX: eliminar definitivo → DELETE real
+  // ✅ FIX: eliminar definitivo → DELETE real, con fallback a soft delete
   const handleEliminarProd = async (id: string) => {
     try {
-      await apiFetch(`/instituciones/${instId}/productos/${id}`, { method: 'DELETE' });
-      toast.success('Producto eliminado');
+      const result = await apiFetch(`/instituciones/${instId}/productos/${id}`, { method: 'DELETE' });
+      if (result?.metodo === 'desactivado') {
+        toast.info('El producto tiene ventas asociadas. Se desactivó del catálogo.');
+      } else {
+        toast.success('Producto eliminado');
+      }
       setConfirmAction(null);
-      setProductos((prev) => prev.filter((p) => p.id !== id));
       cargarDatos();
     } catch (e: any) {
       toast.error(e.message ?? 'Error al eliminar');
