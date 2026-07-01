@@ -376,7 +376,7 @@ export default function TicketsModule() {
                 </div>
 
                 <button
-                  onClick={handleSearch}
+                  onClick={() => handleSearch()}
                   disabled={searchLoading}
                   className="
                     w-full sm:w-auto
