@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   X,
   Wallet,
+  Shield,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ export default function Sidebar({ institutionName, isCollapsed, onCollapseChange
     { label: 'Usuarios', href: '/dashboard/usuarios', icon: Users },
     { label: 'Reportes', href: '/dashboard/reportes', icon: BarChart3 },
     { label: 'Balance', href: '/dashboard/balance', icon: Wallet },
+    { label: 'Auditoría', href: '/dashboard/auditoria', icon: Shield },
   ];
 
   const isActive = (href: string) => {
