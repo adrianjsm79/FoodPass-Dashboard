@@ -260,7 +260,7 @@ export default function CajeroDashboard() {
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Acciones Rápidas</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
-            href="/dashboard/cajero/tickets"
+            href="/cajero/tickets"
             className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition text-center"
           >
             <div className="bg-green-600 p-3 rounded-xl">
@@ -269,7 +269,7 @@ export default function CajeroDashboard() {
             <p className="text-sm font-semibold text-green-800">Validar Tickets</p>
           </Link>
           <Link
-            href="/dashboard/cajero/pos"
+            href="/cajero/pos"
             className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition text-center"
           >
             <div className="bg-blue-600 p-3 rounded-xl">
@@ -278,7 +278,7 @@ export default function CajeroDashboard() {
             <p className="text-sm font-semibold text-blue-800">Punto de Venta</p>
           </Link>
           <Link
-            href="/dashboard/cajero/caja"
+            href="/cajero/caja"
             className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition text-center"
           >
             <div className="bg-purple-600 p-3 rounded-xl flex items-center justify-center h-12 w-12">
@@ -287,7 +287,7 @@ export default function CajeroDashboard() {
             <p className="text-sm font-semibold text-purple-800">Arqueo de Caja</p>
           </Link>
           <Link
-            href="/dashboard/cajero/historial"
+            href="/cajero/historial"
             className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition text-center"
           >
             <div className="bg-slate-600 p-3 rounded-xl flex items-center justify-center h-12 w-12">

@@ -116,7 +116,7 @@ export default function HistorialPage() {
           <History size={32} className="text-slate-700" />
           <h1 className="text-3xl font-bold text-slate-900">Historial del Día</h1>
         </div>
-        <Link href="/dashboard/cajero" className="text-sm font-medium text-slate-500 hover:text-slate-800">
+        <Link href="/cajero" className="text-sm font-medium text-slate-500 hover:text-slate-800">
           Volver
         </Link>
       </div>

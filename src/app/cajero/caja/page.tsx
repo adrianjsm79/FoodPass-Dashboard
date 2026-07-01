@@ -128,7 +128,7 @@ export default function CajaPage() {
           <Wallet size={32} className="text-purple-600" />
           <h1 className="text-3xl font-bold text-slate-900">Arqueo de Caja</h1>
         </div>
-        <Link href="/dashboard/cajero" className="text-sm font-medium text-slate-500 hover:text-slate-800">
+        <Link href="/cajero" className="text-sm font-medium text-slate-500 hover:text-slate-800">
           Volver
         </Link>
       </div>
