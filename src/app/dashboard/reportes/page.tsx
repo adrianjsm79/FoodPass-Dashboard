@@ -278,13 +278,97 @@ export default function ReportesPage() {
   // ─── Export functions using real data ──────────────────────────────────────
 
   function exportCSV() {
-    const headers = ["Período", "APP (S/.)", "POS (S/.)", "Total (S/.)", "Pedidos", "Usuarios"];
-    const rows = salesData.map(d => [d.label, d.app.toFixed(2), d.pos.toFixed(2), (d.app + d.pos).toFixed(2), d.total_pedidos, d.usuarios_unicos]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const fechaGeneracion = new Date().toLocaleString("es-PE", {
+      year: "numeric", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+
+    const auth = getAuth();
+    let institutionName = "Institución";
+    try {
+      const raw = localStorage.getItem("foodpass_auth");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const inst = (parsed.instituciones ?? [])[0];
+        if (inst?.nombre) institutionName = inst.nombre;
+      }
+    } catch { /* ignore */ }
+
+    const lines: string[] = [];
+
+    // ── Header section ──
+    lines.push("REPORTE DE VENTAS - COMEDOR INSTITUCIONAL");
+    lines.push("");
+    lines.push(`Institución:,${institutionName}`);
+    lines.push(`Período analizado:,${periodLabel}`);
+    lines.push(`Fecha de generación:,${fechaGeneracion}`);
+    lines.push(`Generado por:,Sistema FoodPass`);
+    lines.push("");
+
+    // ── Summary section ──
+    lines.push("═══════════════════════════════════════════");
+    lines.push("RESUMEN DE VENTAS");
+    lines.push("═══════════════════════════════════════════");
+    lines.push(`Ingresos Totales:,S/. ${totalIngresos.toFixed(2)}`);
+    lines.push(`Ventas por APP (Prepago):,S/. ${totalApp.toFixed(2)} (${totalApp + totalPos > 0 ? Math.round((totalApp / (totalApp + totalPos)) * 100) : 0}%)`);
+    lines.push(`Ventas POS (Presencial):,S/. ${totalPos.toFixed(2)} (${totalApp + totalPos > 0 ? Math.round((totalPos / (totalApp + totalPos)) * 100) : 0}%)`);
+    lines.push(`Total de Pedidos:,${totalPedidos}`);
+    lines.push(`Usuarios Únicos:,${usuariosTotal}`);
+    lines.push("");
+
+    // ── Detail table (Sales by period) ──
+    lines.push("═══════════════════════════════════════════");
+    lines.push("DETALLE DE VENTAS POR PERÍODO");
+    lines.push("═══════════════════════════════════════════");
+    lines.push("");
+    lines.push(["Período", "Ventas APP (S/.)", "Ventas POS (S/.)", "Total (S/.)", "Cant. Pedidos", "Usuarios"].join(","));
+
+    salesData.forEach(d => {
+      lines.push([
+        d.label,
+        d.app.toFixed(2),
+        d.pos.toFixed(2),
+        (d.app + d.pos).toFixed(2),
+        d.total_pedidos,
+        d.usuarios_unicos,
+      ].join(","));
+    });
+    lines.push("");
+
+    // ── Top Products ──
+    if (topProducts.length > 0) {
+      lines.push("═══════════════════════════════════════════");
+      lines.push("PRODUCTOS MÁS VENDIDOS");
+      lines.push("═══════════════════════════════════════════");
+      lines.push("");
+      lines.push(["Ranking", "Producto", "Unidades Vendidas", "Ingresos Generados (S/.)"].join(","));
+      
+      topProducts.forEach((p, i) => {
+        lines.push([
+          i + 1,
+          `"${p.name}"`,
+          p.qty,
+          p.revenue.toFixed(2),
+        ].join(","));
+      });
+      lines.push("");
+    }
+
+    // ── Footer ──
+    lines.push("═══════════════════════════════════════════");
+    lines.push("NOTA: Este reporte fue generado automáticamente por el sistema FoodPass.");
+    lines.push("Los montos están expresados en Soles (S/.).");
+
+    // BOM for Excel UTF-8 compatibility
+    const BOM = "\uFEFF";
+    const csv = BOM + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `reporte_ventas_${period}.csv`; a.click();
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `reporte_ventas_${period}_${fecha}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
   }
 
