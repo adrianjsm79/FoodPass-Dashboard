@@ -288,6 +288,123 @@ export default function ReportesPage() {
     URL.revokeObjectURL(url);
   }
 
+  function exportDebtCSV() {
+    const fechaGeneracion = new Date().toLocaleString("es-PE", {
+      year: "numeric", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+
+    const auth = getAuth();
+    const instName = auth ? "Institución" : "Institución";
+    // Try to get institution name from localStorage
+    let institutionName = instName;
+    try {
+      const raw = localStorage.getItem("foodpass_auth");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const inst = (parsed.instituciones ?? [])[0];
+        if (inst?.nombre) institutionName = inst.nombre;
+      }
+    } catch { /* ignore */ }
+
+    const lines: string[] = [];
+
+    // ── Header section ──
+    lines.push("REPORTE DE DEUDAS POSTPAGO - COMEDOR INSTITUCIONAL");
+    lines.push("");
+    lines.push(`Institución:,${institutionName}`);
+    lines.push(`Fecha de generación:,${fechaGeneracion}`);
+    lines.push(`Generado por:,Sistema FoodPass`);
+    lines.push("");
+
+    // ── Summary section ──
+    lines.push("═══════════════════════════════════════════");
+    lines.push("RESUMEN");
+    lines.push("═══════════════════════════════════════════");
+    lines.push(`Total de usuarios con deuda:,${debtors.length}`);
+    lines.push(`Monto total adeudado:,S/. ${totalDeuda.toFixed(2)}`);
+    if (debtors.length > 0) {
+      const maxDeuda = Math.max(...debtors.map(d => parseFloat(String(d.saldo_deuda))));
+      const minDeuda = Math.min(...debtors.map(d => parseFloat(String(d.saldo_deuda))));
+      const promDeuda = totalDeuda / debtors.length;
+      lines.push(`Deuda máxima individual:,S/. ${maxDeuda.toFixed(2)}`);
+      lines.push(`Deuda mínima individual:,S/. ${minDeuda.toFixed(2)}`);
+      lines.push(`Deuda promedio:,S/. ${promDeuda.toFixed(2)}`);
+
+      const criticos = debtors.filter(d => {
+        const deuda = parseFloat(String(d.saldo_deuda));
+        const limite = parseFloat(String(d.limite_credito));
+        return limite > 0 && (deuda / limite) * 100 > 80;
+      });
+      lines.push(`Usuarios en estado crítico (>80% del límite):,${criticos.length}`);
+    }
+    lines.push("");
+
+    // ── Detail table ──
+    lines.push("═══════════════════════════════════════════");
+    lines.push("DETALLE DE DEUDAS POR USUARIO");
+    lines.push("═══════════════════════════════════════════");
+    lines.push("");
+    lines.push([
+      "N°",
+      "Nombre Completo",
+      "Correo Electrónico",
+      "Deuda Actual (S/.)",
+      "Límite de Crédito (S/.)",
+      "% Uso del Límite",
+      "Estado",
+      "Última Actividad",
+    ].join(","));
+
+    debtors.forEach((d, i) => {
+      const deuda = parseFloat(String(d.saldo_deuda));
+      const limite = parseFloat(String(d.limite_credito));
+      const usoPct = limite > 0 ? (deuda / limite) * 100 : 0;
+
+      let estado = "Normal";
+      if (usoPct > 80) estado = "CRÍTICO";
+      else if (usoPct > 50) estado = "Atención";
+
+      const ultimaAct = d.actualizado_en
+        ? new Date(d.actualizado_en).toLocaleDateString("es-PE", {
+            year: "numeric", month: "2-digit", day: "2-digit",
+          })
+        : "Sin registro";
+
+      // Wrap name and email in quotes to handle commas in names
+      lines.push([
+        i + 1,
+        `"${d.nombre_completo}"`,
+        `"${d.correo}"`,
+        deuda.toFixed(2),
+        limite.toFixed(2),
+        `${usoPct.toFixed(1)}%`,
+        estado,
+        ultimaAct,
+      ].join(","));
+    });
+
+    // ── Footer ──
+    lines.push("");
+    lines.push("═══════════════════════════════════════════");
+    lines.push(`TOTAL DEUDA ACUMULADA:,S/. ${totalDeuda.toFixed(2)}`);
+    lines.push("");
+    lines.push("NOTA: Este reporte fue generado automáticamente por el sistema FoodPass.");
+    lines.push("Los montos están expresados en Soles (S/.). Para consultas contactar al administrador del comedor.");
+
+    // BOM for Excel UTF-8 compatibility
+    const BOM = "\uFEFF";
+    const csv = BOM + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `reporte_deudas_postpago_${fecha}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function exportPDF() {
     const html = `
       <html><head><title>Reporte FoodPass</title>
@@ -544,11 +661,25 @@ export default function ReportesPage() {
             {/* Debtors */}
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-slate-800">Usuarios con Deuda</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-slate-800">Usuarios con Deuda</h2>
+                  {debtors.length > 0 && (
+                    <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                      {debtors.length} usuario{debtors.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
                 {debtors.length > 0 && (
-                  <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">
-                    {debtors.length} usuario{debtors.length !== 1 ? "s" : ""}
-                  </span>
+                  <button
+                    onClick={() => { exportDebtCSV(); showToast("Reporte de deudas exportado para RRHH"); }}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 active:scale-95 transition-transform shadow-sm"
+                    title="Exportar reporte de deudas para Recursos Humanos"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Exportar para RRHH
+                  </button>
                 )}
               </div>
               {debtors.length === 0 ? (
