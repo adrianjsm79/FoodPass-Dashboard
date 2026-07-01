@@ -258,24 +258,42 @@ export default function CajeroDashboard() {
       {/* Acciones Rápidas */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Acciones Rápidas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             href="/dashboard/cajero/tickets"
-            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition"
+            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition text-center"
           >
             <div className="bg-green-600 p-3 rounded-xl">
               <Ticket size={24} className="text-white" />
             </div>
-            <p className="text-sm font-semibold text-green-800">Validar Tickets APP</p>
+            <p className="text-sm font-semibold text-green-800">Validar Tickets</p>
           </Link>
           <Link
             href="/dashboard/cajero/pos"
-            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition"
+            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition text-center"
           >
             <div className="bg-blue-600 p-3 rounded-xl">
               <ShoppingCart size={24} className="text-white" />
             </div>
-            <p className="text-sm font-semibold text-blue-800">Punto de Venta POS</p>
+            <p className="text-sm font-semibold text-blue-800">Punto de Venta</p>
+          </Link>
+          <Link
+            href="/dashboard/cajero/caja"
+            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition text-center"
+          >
+            <div className="bg-purple-600 p-3 rounded-xl flex items-center justify-center h-12 w-12">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+            </div>
+            <p className="text-sm font-semibold text-purple-800">Arqueo de Caja</p>
+          </Link>
+          <Link
+            href="/dashboard/cajero/historial"
+            className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition text-center"
+          >
+            <div className="bg-slate-600 p-3 rounded-xl flex items-center justify-center h-12 w-12">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            </div>
+            <p className="text-sm font-semibold text-slate-800">Historial / Anulación</p>
           </Link>
         </div>
       </div>
