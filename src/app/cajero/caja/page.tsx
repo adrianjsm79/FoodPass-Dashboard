@@ -106,7 +106,7 @@ export default function CajaPage() {
         body: JSON.stringify({ turno_id: turno.id, monto_declarado: parseFloat(montoDeclarado) || 0 })
       });
       alert(`Caja Cerrada.\nMonto Sistema: S/. ${res.monto_sistema}\nMonto Declarado: S/. ${res.monto_declarado}`);
-      router.push('/dashboard/cajero');
+      router.push('/cajero');
     } catch (e: any) {
       setError(e.message);
       setProcesando(false);
