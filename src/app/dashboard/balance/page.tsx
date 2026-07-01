@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Download, Wallet, CreditCard, Filter, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -271,6 +272,30 @@ export default function BalancePage() {
               </table>
             </div>
           </div>
+          
+          {/* Gráfico de Balance */}
+          {!isLoading && arqueos.length > 0 && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">Comparativa: Sistema vs Declarado</h2>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[...arqueos].reverse().map(a => ({
+                    name: new Date(a.fecha_apertura).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                    sistema: parseFloat(a.monto_sistema || '0'),
+                    declarado: parseFloat(a.monto_declarado || '0')
+                  }))} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(val) => `S/. ${val}`} />
+                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                    <Bar dataKey="sistema" name="Monto Sistema" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                    <Bar dataKey="declarado" name="Monto Declarado" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
