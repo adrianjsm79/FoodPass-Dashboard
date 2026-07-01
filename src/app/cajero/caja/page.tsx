@@ -156,7 +156,7 @@ export default function CajaPage() {
                 required
                 value={montoInicial}
                 onChange={(e) => setMontoInicial(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none text-lg"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 bg-white focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none text-lg"
               />
             </div>
             <button
@@ -192,7 +192,7 @@ export default function CajaPage() {
                 required
                 value={montoDeclarado}
                 onChange={(e) => setMontoDeclarado(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none text-lg"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-slate-900 bg-white focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none text-lg"
                 placeholder="Ej. 150.50"
               />
             </div>
