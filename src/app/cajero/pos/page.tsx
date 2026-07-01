@@ -235,7 +235,7 @@ export default function CajeroPOS() {
                 placeholder="Buscar producto..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
           </div>
