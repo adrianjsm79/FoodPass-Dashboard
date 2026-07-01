@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import CategoryFilter from '../../dashboard/components/pos/CategoryFilter';
 import ProductCard, { Product } from '../../dashboard/components/pos/ProductCard';
 import POSOrderPanel, { CartItem } from '../../dashboard/components/pos/POSOrderPanel';
+import { PostPagoAccount } from '../../dashboard/components/pos/PaymentModals';
 
 interface ProductoAPI {
   id: string;
@@ -34,6 +35,7 @@ export default function CajeroPOS() {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
   const [isLoading, setIsLoading] = useState(true);
+  const [postPagoAccounts, setPostPagoAccounts] = useState<PostPagoAccount[]>([]);
 
   const institutionId = auth?.instituciones?.[0]?.id ?? '';
   const token = auth?.accessToken ?? '';
@@ -41,25 +43,25 @@ export default function CajeroPOS() {
   useEffect(() => {
     if (!institutionId || !token) return;
 
-    const cargarProductos = async () => {
+    const cargarDatos = async () => {
       setIsLoading(true);
 
       try {
-        const res = await fetch(`${API_URL}/instituciones/${institutionId}/productos`, {
+        // Cargar productos
+        const resProductos = await fetch(`${API_URL}/instituciones/${institutionId}/productos`, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error ?? body?.mensaje ?? `Error ${res.status}`);
+        if (!resProductos.ok) {
+          throw new Error('Error al cargar productos');
         }
 
-        const data = (await res.json()) as ProductoAPI[];
+        const dataProductos = (await resProductos.json()) as ProductoAPI[];
 
-        const productsFormatted: Product[] = data
+        const productsFormatted: Product[] = dataProductos
           .filter((p) => p.estado === 'activo' || p.activo === true)
           .map((p) => ({
             id: p.id,
@@ -78,15 +80,35 @@ export default function CajeroPOS() {
         ].sort() as string[];
 
         setCategories(uniqueCategories);
+
+        // Cargar cuentas postpago
+        const resCuentas = await fetch(`${API_URL}/instituciones/${institutionId}/postpago/cuentas`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (resCuentas.ok) {
+          const dataCuentas = await resCuentas.json();
+          const formattedAccounts: PostPagoAccount[] = dataCuentas.map((acc: any) => ({
+            id: acc.id,
+            name: acc.nombre_completo,
+            accountCode: acc.correo,
+            currentDebt: Number(acc.saldo_deuda),
+            creditLimit: Number(acc.limite_credito),
+          }));
+          setPostPagoAccounts(formattedAccounts);
+        }
       } catch (error: unknown) {
         console.error('Error:', error);
-        toast.error(error instanceof Error ? error.message : 'Error al cargar productos');
+        toast.error(error instanceof Error ? error.message : 'Error al cargar datos');
       } finally {
         setIsLoading(false);
       }
     };
 
-    cargarProductos();
+    cargarDatos();
   }, [institutionId, token]);
 
   const categoriesWithAll = ['Todas', ...categories];
@@ -146,7 +168,10 @@ export default function CajeroPOS() {
     setCartItems([]);
   };
 
-  const handlePayment = async (method: 'efectivo' | 'yape' | 'postpago') => {
+  const handlePayment = async (
+    method: 'efectivo' | 'yape' | 'postpago',
+    options?: { cuenta_postpago_id?: string; referencia_externa?: string }
+  ) => {
     if (cartItems.length === 0) return;
 
     try {
@@ -161,6 +186,8 @@ export default function CajeroPOS() {
         body: JSON.stringify({
           canal: 'POS',
           metodo_pago: method,
+          cuenta_postpago_id: options?.cuenta_postpago_id,
+          referencia_externa: options?.referencia_externa,
           items: cartItems.map((item) => ({
             producto_id: item.productId,
             cantidad: item.quantity,
@@ -247,6 +274,7 @@ export default function CajeroPOS() {
           <div className="sticky top-6">
             <POSOrderPanel
               items={cartItems}
+              postPagoAccounts={postPagoAccounts}
               onQuantityChange={handleQuantityChange}
               onRemoveItem={handleRemoveItem}
               onVaciar={handleVaciar}
