@@ -53,7 +53,7 @@ export default function CajaPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Form states
-  const [montoInicial, setMontoInicial] = useState('0.00');
+  const [montoInicial, setMontoInicial] = useState('');
   const [montoDeclarado, setMontoDeclarado] = useState('');
   const [procesando, setProcesando] = useState(false);
 
@@ -151,7 +151,7 @@ export default function CajaPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Monto Inicial (Sencillo en caja) S/.</label>
               <input
                 type="number"
-                step="0.10"
+                step="any"
                 min="0"
                 required
                 value={montoInicial}
@@ -187,7 +187,7 @@ export default function CajaPage() {
               <p className="text-xs text-slate-500 mb-2">Cuenta todo el dinero físico en tu cajón y decláralo aquí.</p>
               <input
                 type="number"
-                step="0.10"
+                step="any"
                 min="0"
                 required
                 value={montoDeclarado}
