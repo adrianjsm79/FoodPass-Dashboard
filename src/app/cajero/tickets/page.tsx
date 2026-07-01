@@ -140,9 +140,12 @@ export default function TicketsModule() {
     fetchTodayStats();
   }, [fetchTodayStats]);
 
+  const controlsRef = useRef<any>(null);
+  const isProcessingScanRef = useRef(false);
+
   // ── Search ──
-  const handleSearch = async () => {
-    const code = searchQuery.trim().toUpperCase();
+  const handleSearch = async (overrideCode?: string) => {
+    const code = (overrideCode ?? searchQuery).trim().toUpperCase();
     if (!code) {
       toast.error('Ingresa un código');
       return;
@@ -228,24 +231,47 @@ export default function TicketsModule() {
   // ── QR Scanner ──
   const startQRScanner = async () => {
     setShowQRScanner(true);
+    isProcessingScanRef.current = false;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      const codeReader = new BrowserMultiFormatReader();
+      
+      // Wait slightly for the video element to be mounted in the DOM
+      setTimeout(async () => {
+        if (!videoRef.current) return;
+        try {
+          controlsRef.current = await codeReader.decodeFromVideoDevice(
+            undefined, // undefined picks the default back camera on mobile
+            videoRef.current,
+            (result, err) => {
+              if (result && !isProcessingScanRef.current) {
+                isProcessingScanRef.current = true;
+                const text = result.getText();
+                setSearchQuery(text);
+                toast.success('Código escaneado');
+                stopQRScanner();
+                handleSearch(text).finally(() => {
+                  isProcessingScanRef.current = false;
+                });
+              }
+            }
+          );
+        } catch (e) {
+          toast.error('Error al inicializar la cámara');
+          setShowQRScanner(false);
+        }
+      }, 150);
     } catch {
-      toast.error('No se pudo acceder a la cámara');
+      toast.error('No se pudo cargar el escáner');
       setShowQRScanner(false);
     }
   };
 
   const stopQRScanner = () => {
     setShowQRScanner(false);
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach((track) => track.stop());
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
     }
   };
 
