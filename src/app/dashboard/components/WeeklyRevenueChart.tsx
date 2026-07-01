@@ -179,7 +179,7 @@ export default function WeeklyRevenueChart() {
                   fontSize: '14px',
                 }}
                 cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                formatter={(value: number) => [`S/. ${value.toFixed(2)}`, undefined]}
+                formatter={(value: any) => [`S/. ${Number(value).toFixed(2)}`, undefined]}
               />
               <Legend
                 wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }}
